@@ -14,6 +14,7 @@ import java.util.Map;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
+import javax.swing.KeyStroke;
 
 import model.Blob;
 import model.BondSite;
@@ -49,6 +50,7 @@ import prefuse.util.force.ForceSimulator;
 import prefuse.util.ui.JForcePanel;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
+import prefuse.visual.NodeItem;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
 import prefuse.visual.sort.TreeDepthItemSorter;
@@ -115,17 +117,35 @@ public class BlobVis extends JPanel {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			Node r = g.getNode(0);
+			Node r = g.getSpanningTree().getRoot();
+			Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
+			System.out.println(apb.opCode() + ": " + apb.getCargo());
+			BondSite b = BondSite.create((2 + 1) & apb.getCargo());
 
-			System.out.println(r.get(BlobFuse.BLOBFIELD));
+			r.set(BlobFuse.BLOBTYPE, 3);
+			if (apb.opCode().startsWith("JB")) {
+				if (m.ADB().follow(b) != null) {
+					b = BondSite.South;
+				} else {
+					b = BondSite.West;
+				}
+				Blob next = apb.follow(b);
+			} else {
+				b = BondSite.South;
+			}
 
-			m_vis.cancel("init");
-			m_vis.run("init");
+			Node nn = (Node) r.get(BlobFuse.BLOBBS + b.ordinal());
+			nn.set(BlobFuse.BLOBTYPE, 1);
+			g.getSpanningTree((Node) nn);
+			m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(nn);
+			System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS).getTupleCount());
+
+			m.step();
+
 		}
 
 	}
 
-	
 	Node selected = null;
 	private static final String GRAPH = "graph";
 	private static final String EDGES = "graph.edges";
@@ -177,6 +197,7 @@ public class BlobVis extends JPanel {
 		m_vis.putAction("singleforce", singleforce);
 
 		ActionList base = new ActionList(Action.INFINITY, 100);
+		base.add(filter);
 		base.add(genColors()); // base.add(new AggregateLayout(AGGR));
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
@@ -207,21 +228,21 @@ public class BlobVis extends JPanel {
 		display.addControlListener(new WheelZoomControl());
 		display.addControlListener(new ZoomToFitControl());
 		// create a panel for editing force values
-        ForceSimulator fsim = ((ForceDirectedLayout)force.get(1)).getForceSimulator();
-        JForcePanel fpanel = new JForcePanel(fsim);
-		
-		 JSplitPane split = new JSplitPane();
-	        split.setLeftComponent(display);
-	        split.setRightComponent(fpanel);
-	        split.setOneTouchExpandable(true);
-	        split.setContinuousLayout(false);
-	        split.setDividerLocation(-1);
-	        
-	        // now we run our action list
-	        m_vis.run("draw");
-	        
-	     add(split);
-		
+		ForceSimulator fsim = ((ForceDirectedLayout) force.get(1))
+				.getForceSimulator();
+		JForcePanel fpanel = new JForcePanel(fsim);
+
+		JSplitPane split = new JSplitPane();
+		split.setLeftComponent(display);
+		split.setRightComponent(fpanel);
+		split.setOneTouchExpandable(true);
+		split.setContinuousLayout(false);
+		split.setDividerLocation(-1);
+
+		// now we run our action list
+		m_vis.run("draw");
+
+		add(split);
 
 		// set things running
 		m_vis.run("init");
@@ -231,19 +252,18 @@ public class BlobVis extends JPanel {
 			m_vis.run("force");
 		}
 
+		display.registerKeyboardAction(new SwitchAction(), "switchit",
+				KeyStroke.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
 		/*
-		registerKeyboardAction(new SwitchAction(), "switchit", KeyStroke
-				.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
-
-		registerKeyboardAction(new StepModelAction(), "switchit5", KeyStroke
-				.getKeyStroke("ctrl 5"), WHEN_FOCUSED);
-
-		registerKeyboardAction(new PauseForceAction(), "pauseforce", KeyStroke
-				.getKeyStroke("P"), WHEN_FOCUSED);
-
-		registerKeyboardAction(new SingleForceAction(), "singleforce",
-				KeyStroke.getKeyStroke("S"), WHEN_FOCUSED);
-		*/
+		 * registerKeyboardAction(new StepModelAction(), "switchit5", KeyStroke
+		 * .getKeyStroke("ctrl 5"), WHEN_FOCUSED);
+		 * 
+		 * registerKeyboardAction(new PauseForceAction(), "pauseforce",
+		 * KeyStroke .getKeyStroke("P"), WHEN_FOCUSED);
+		 * 
+		 * registerKeyboardAction(new SingleForceAction(), "singleforce",
+		 * KeyStroke.getKeyStroke("S"), WHEN_FOCUSED);
+		 */
 
 		System.out.println("NodeCount: " + g.getNodeCount());
 
@@ -314,7 +334,7 @@ public class BlobVis extends JPanel {
 			aStroke.add("_hover", ColorLib.rgb(255, 100, 100));
 
 			ActionList colors = new ActionList();
-			
+
 			if (use_aggregate) {
 				int[] palette = new int[] { ColorLib.rgba(255, 200, 200, 150),
 						ColorLib.rgba(200, 255, 200, 150),
@@ -324,10 +344,20 @@ public class BlobVis extends JPanel {
 				colors.add(aFill);
 			}
 
+			int[] palette = new int[] { ColorLib.rgba(255, 100, 100, 200), // apb
+					ColorLib.rgba(100, 255, 100, 200), // adb
+					ColorLib.rgba(255, 200, 200, 170), // inpgr
+					ColorLib.rgba(200, 255, 200, 170), // data
+			};
+			ColorAction nFillAdb = new DataColorAction(NODES,
+					BlobFuse.BLOBTYPE, Constants.NOMINAL, VisualItem.FILLCOLOR,
+					palette);
+
 			// bundle the color actions
-			
+
 			colors.add(nStroke);
 			colors.add(nFill);
+			colors.add(nFillAdb);
 			colors.add(nEdges);
 			colors.add(nEdgesText);
 			colors.add(new FontAction(EDGES, FontLib.getFont("SansSerif",
@@ -349,7 +379,8 @@ public class BlobVis extends JPanel {
 		m_vis.removeGroup(GRAPH);
 		VisualGraph vg = m_vis.addGraph(GRAPH, g);
 		m_vis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
-		VisualItem f = (VisualItem) vg.getNode(0);// .getChild(1);
+		VisualItem f = (VisualItem) vg.getNode(0); 
+				// .getChild(1);
 		m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
 		f.setFixed(false);
 
@@ -358,6 +389,7 @@ public class BlobVis extends JPanel {
 	}
 
 	Graph g;
+	VisualGraph vg;
 	private Model m;
 	private boolean use_aggregate = false;
 
@@ -369,8 +401,10 @@ public class BlobVis extends JPanel {
 		m.readConfiguration(filename);
 		nodel = new HashMap<Blob, Node>();
 		nodelf = new ArrayList<Blob>();
-		dfsBlob(m.APB());
-		VisualGraph vg = setGraph(g);
+
+		vg = m_vis.addGraph(GRAPH, g);
+		dfsBlob(m.APB(), m);
+		vg = setGraph(g);
 
 		if (use_aggregate) {
 			fillAggregates(vg);
@@ -464,7 +498,7 @@ public class BlobVis extends JPanel {
 
 			nodel = new HashMap<Blob, Node>();
 			nodelf = new ArrayList<Blob>();
-			dfsBlob(pb1);
+			dfsBlob(pb1, null);
 
 		}
 		return type;
@@ -475,11 +509,23 @@ public class BlobVis extends JPanel {
 
 	boolean inpgr = true;
 
-	private Node dfsBlob(Blob pb1) {
+	private Node dfsBlob(Blob pb1, Model m) {
 		Blob cur = pb1;
+
 		if (!nodel.containsKey(cur)) {
-			Node n = g.addNode();
+			Node n = vg.addNode();
 			nodel.put(cur, n);
+
+			if (m.APB().equals(cur)) {
+				System.out.println("Found apb");
+				n.set(BlobFuse.BLOBTYPE, 1);
+			} else if (m.ADB().equals(cur)) {
+				n.set(BlobFuse.BLOBTYPE, 2);
+			} else if (inpgr) {
+				n.set(BlobFuse.BLOBTYPE, 3);
+			} else {
+				n.set(BlobFuse.BLOBTYPE, 4);
+			}
 
 			n.set(BlobFuse.BLOBFIELD, cur);
 			if (inpgr) {
@@ -488,6 +534,7 @@ public class BlobVis extends JPanel {
 				n.setString(LABEL, "" + cur.getCargo());
 			}
 			n.set(BlobFuse.BLOBINPGR, inpgr);
+			int cidx = 0;
 			for (int i = 3; i >= 0; i--) {
 				Blob bn = cur.follow(BondSite.create(i));
 
@@ -498,16 +545,23 @@ public class BlobVis extends JPanel {
 						if (i == 0 && inpgr) {
 							inpgr = false;
 						}
-						nn = dfsBlob(bn);
+						nn = dfsBlob(bn, m);
 					} else if (!nodelf.contains(bn)) {
 						nn = nodel.get(bn);
 					}
 					if (nn != null) {
-						Edge e = g.addEdge(n, nn);
+						Edge e = vg.addEdge(n, nn);
+						n.set(BlobFuse.BLOBBS + i, nn);
+						cidx++;
+
 						e.set(BlobFuse.EDGENUMBERSRC, i);
 						BondSite otherend = bn.boundTo(cur);
-						if (otherend != null)
+						if (otherend != null) {
 							e.set(BlobFuse.EDGENUMBERTAR, otherend.ordinal());
+							System.out.println(otherend + " " + (n == null)
+									+ " " + (nn == null));
+							nn.set(BlobFuse.BLOBBS + (otherend.ordinal()), n);
+						}
 					}
 				}
 			}
