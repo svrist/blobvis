@@ -7,7 +7,6 @@ import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 
-import model.Blob;
 import prefuse.render.EdgeRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.GraphicsLib;
@@ -16,53 +15,25 @@ import prefuse.visual.VisualItem;
 
 public class BlobEdgeRenderer extends EdgeRenderer {
 
-
-
-	/*@Override
-	protected void setup_tmpPoints(VisualItem item1, VisualItem item2) {
-		// TODO Auto-generated method stub
-
-		if (!item1.canGet(BlobFuse.BLOBFIELD, Blob.class)
-				|| !item2.canGet(BlobFuse.BLOBFIELD, Blob.class)) {
-			super.setup_tmpPoints(item1, item2);
-			return;
-		}
-		Blob from = (Blob) item1.get(BlobFuse.BLOBFIELD);
-		Blob to = (Blob) item2.get(BlobFuse.BLOBFIELD);
-		int bsf = from.boundTo(to).ordinal();
-
-		getAlignedPoint(m_tmpPoints[0], item1.getBounds(), bsf);
-		if (to.boundTo(from) != null){
-		int bst = to.boundTo(from).ordinal();
-		getAlignedPoint(m_tmpPoints[1], item2.getBounds(), bst);
-		}else{
-			System.out.println("no end? "+from.opCode()+ " -> "+to.opCode());
-		}
+	public BlobEdgeRenderer() {
+		super();
 	}
 
-	protected static void getAlignedPoint(Point2D p, Rectangle2D r,
-			int bsordinal) {
-		double x = r.getX(), y = r.getY(), w = r.getWidth(), h = r.getHeight();
+	public BlobEdgeRenderer(int edgeType, int arrowType) {
+		super(edgeType, arrowType);
+		// TODO Auto-generated constructor stub
+	}
 
-		switch (bsordinal) {
-		case 0: // NORTH
-			x = x + w; // going out in the top right
-			break;
-		case 1: // EAST
-			x = x+w/2; // going out/in in the middel of the top
-			break;
-		case 2: // SOUTH
-			y +=h; // bottom right;
+	public BlobEdgeRenderer(int edgeType) {
+		super(edgeType);
+	}
+	
+	public BlobEdgeRenderer(float zoom_cutoff){
+		this.zoom_cutoff = zoom_cutoff; 
+	}
 
-			break;
-		case 3: // WEST
-			y +=h; // bottom left;
-			x +=w;
-			break;
-		}
-		p.setLocation(x, y);
+	float zoom_cutoff = 0.6f;
 
-	}*/
 
 
 	/**
@@ -73,32 +44,39 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 		// render the edge line
 		super.render(g, item);
 		EdgeItem   edge = (EdgeItem)item;
-		VisualItem item1 = edge.getSourceItem();
+		/*VisualItem item1 = edge.getSourceItem();
 		VisualItem item2 = edge.getTargetItem();
-
-
 		if (!item1.canGet(BlobFuse.BLOBFIELD, Blob.class)
 				|| !item2.canGet(BlobFuse.BLOBFIELD, Blob.class)) {
+			return;
+		}*/
+		if (!edge.canGet(BlobFuse.EDGENUMBERSRC, Integer.class)){
+			return;
+		}
+		
+		boolean useInt = zoom_cutoff > Math.max(g.getTransform().getScaleX(),
+				g.getTransform().getScaleY());
+		if (useInt){
 			return;
 		}
 
 
 		// Draw bond site text:
 		int textColor = item.getTextColor();
-
+/*
 		Blob from = (Blob) item1.get(BlobFuse.BLOBFIELD);
-		Blob to = (Blob) item2.get(BlobFuse.BLOBFIELD);
-		int bsf = from.boundTo(to).ordinal();
-		int bst = -1;
-		if (to.boundTo(from) != null){
+		Blob to = (Blob) item2.get(BlobFuse.BLOBFIELD);*/
+		int bsf = (Integer)edge.get(BlobFuse.EDGENUMBERSRC);
+		int bst = (Integer)edge.get(BlobFuse.EDGENUMBERTAR);
+		/*if (to.boundTo(from) != null){
 			bst = to.boundTo(from).ordinal();
-		}
-		drawBondsite(g, item.getFont(), item1, textColor, ""+bsf);
-		drawBondsite(g, item.getFont(), item2, textColor, ""+bst);
+		}*/
+		drawBondsite(g, item.getFont(), edge.getSourceItem().getBounds(), textColor, ""+bsf);
+		drawBondsite(g, item.getFont(), edge.getTargetItem().getBounds(), textColor, ""+bst);
 
 	}
 
-	private void drawBondsite(Graphics2D g, Font m_font, VisualItem item1,
+	private void drawBondsite(Graphics2D g, Font m_font, Rectangle2D itembounds,
 			int textColor, String text) {
 		boolean useInt = 1.5 > Math.max(g.getTransform().getScaleX(),
 				g.getTransform().getScaleY());
@@ -113,7 +91,7 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 		m_textDim.width = fm.stringWidth(text);
 		m_textDim.height = fm.getHeight();
 
-		Rectangle2D bounds = (Rectangle2D)item1.getBounds().clone();
+		Rectangle2D bounds = (Rectangle2D) itembounds.clone();
 
 		// Increase size of box to counter that text is defined from the bottom left corner
 		bounds.setRect(bounds.getX()-m_textDim.width, bounds.getY()-ypadding,

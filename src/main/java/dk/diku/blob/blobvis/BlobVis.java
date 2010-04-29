@@ -1,5 +1,6 @@
 package dk.diku.blob.blobvis;
 
+import java.awt.Font;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -23,6 +24,7 @@ import prefuse.action.ActionList;
 import prefuse.action.RepaintAction;
 import prefuse.action.assignment.ColorAction;
 import prefuse.action.assignment.DataColorAction;
+import prefuse.action.assignment.FontAction;
 import prefuse.action.filter.GraphDistanceFilter;
 import prefuse.action.layout.Layout;
 import prefuse.action.layout.graph.ForceDirectedLayout;
@@ -37,14 +39,10 @@ import prefuse.data.Edge;
 import prefuse.data.Graph;
 import prefuse.data.Node;
 import prefuse.data.Schema;
-import prefuse.data.Tuple;
-import prefuse.data.event.TupleSetListener;
-import prefuse.data.tuple.TupleSet;
 import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
-import prefuse.render.PolygonRenderer;
-import prefuse.render.Renderer;
 import prefuse.util.ColorLib;
+import prefuse.util.FontLib;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
@@ -246,7 +244,7 @@ public class BlobVis extends Display {
 		setHighQuality(true);
 		setItemSorter(new TreeDepthItemSorter());
 
-		//addControlListener(new AggregateDragControl());
+		addControlListener(new BlobDragControl());
 		addControlListener(new FocusControl(1));
 		addControlListener(new PanControl());
 		addControlListener(new ZoomControl());
@@ -352,6 +350,7 @@ public class BlobVis extends Display {
 			colors.add(nFill);
 			colors.add(nEdges);
 			colors.add(nEdgesText);
+			colors.add(new FontAction(EDGES, FontLib.getFont("SansSerif", Font.PLAIN, 8)));
 			colors.add(nText);
 			colors.add(aStroke);
 			colors.add(aFill);
@@ -506,7 +505,9 @@ public class BlobVis extends Display {
 			n.set(BlobFuse.BLOBINPGR, inpgr);
 			for (int i = 3; i >= 0; i--) {
 				Blob bn = cur.follow(BondSite.create(i));
+				
 				if (bn != null) {
+					
 					Node nn = null;
 					if (!nodel.containsKey(bn)) {
 						if (i == 0 && inpgr) {
@@ -517,7 +518,11 @@ public class BlobVis extends Display {
 						nn = nodel.get(bn);
 					}
 					if (nn != null) {
-						g.addEdge(n, nn);
+						Edge e = g.addEdge(n, nn);
+						e.set(BlobFuse.EDGENUMBERSRC,i );
+						BondSite otherend = bn.boundTo(cur);
+						if (otherend != null)						
+							e.set(BlobFuse.EDGENUMBERTAR,otherend.ordinal() );
 					}
 				}
 			}

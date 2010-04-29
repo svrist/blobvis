@@ -3,19 +3,17 @@ package dk.diku.blob.blobvis;
 import java.awt.Cursor;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
-import java.util.Iterator;
 
 import javax.swing.SwingUtilities;
 
 import prefuse.Display;
 import prefuse.controls.ControlAdapter;
-import prefuse.visual.AggregateItem;
 import prefuse.visual.VisualItem;
 
 /**
  * Interactive drag control that is "aggregate-aware"
  */
-class AggregateDragControl extends ControlAdapter {
+class BlobDragControl extends ControlAdapter {
 
 	private VisualItem activeItem;
 	protected Point2D down = new Point2D.Double();
@@ -27,7 +25,7 @@ class AggregateDragControl extends ControlAdapter {
 	 * Creates a new drag control that issues repaint requests as an item
 	 * is dragged.
 	 */
-	public AggregateDragControl() {
+	public BlobDragControl() {
 	}
 
 	/**
@@ -38,8 +36,8 @@ class AggregateDragControl extends ControlAdapter {
 		Display d = (Display)e.getSource();
 		d.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		activeItem = item;
-		if ( !(item instanceof AggregateItem) )
-			setFixed(item, true);
+		/*if ( !(item instanceof AggregateItem) )*/
+		setFixed(item, true);
 	}
 
 	/**
@@ -64,8 +62,8 @@ class AggregateDragControl extends ControlAdapter {
 		dragged = false;
 		Display d = (Display)e.getComponent();
 		d.getAbsoluteCoordinate(e.getPoint(), down);
-		if ( item instanceof AggregateItem )
-			setFixed(item, true);
+		/*if ( item instanceof AggregateItem )
+			setFixed(item, true);*/
 		paused=!item.getVisualization().getAction("force").isRunning();
 		item.getVisualization().cancel("force");
 		item.getVisualization().run("force");
@@ -108,30 +106,30 @@ class AggregateDragControl extends ControlAdapter {
 
 	@SuppressWarnings("unchecked")
 	protected static void setFixed(VisualItem item, boolean fixed) {
-		if ( item instanceof AggregateItem ) {
+		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
 			while ( items.hasNext() ) {
 				setFixed(items.next(), fixed);
 			}
-		} else {
+		} else {*/
 			item.setFixed(fixed);
-		}
+		/*}*/
 	}
 
 	@SuppressWarnings("unchecked")
 	protected static void move(VisualItem item, double dx, double dy) {
-		if ( item instanceof AggregateItem ) {
+		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
 			while ( items.hasNext() ) {
 				move(items.next(), dx, dy);
 			}
-		}else{
+		}else{*/
 			double x = item.getX();
 			double y = item.getY();
 			item.setStartX(x);  item.setStartY(y);
 			item.setX(x+dx);    item.setY(y+dy);
 			item.setEndX(x+dx); item.setEndY(y+dy);
-		}
+		/*}*/
 
 	}
 
