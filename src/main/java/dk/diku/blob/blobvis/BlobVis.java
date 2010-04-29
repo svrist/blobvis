@@ -1,5 +1,6 @@
 package dk.diku.blob.blobvis;
 
+import java.awt.BorderLayout;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
@@ -11,7 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.JFrame;
-import javax.swing.KeyStroke;
+import javax.swing.JPanel;
+import javax.swing.JSplitPane;
 
 import model.Blob;
 import model.BondSite;
@@ -43,6 +45,8 @@ import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.FontLib;
+import prefuse.util.force.ForceSimulator;
+import prefuse.util.ui.JForcePanel;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
@@ -50,17 +54,17 @@ import prefuse.visual.VisualItem;
 import prefuse.visual.sort.TreeDepthItemSorter;
 
 @SuppressWarnings("serial")
-public class BlobVis extends Display {
+public class BlobVis extends JPanel {
 	public class SingleForceAction implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
 			// TODO Auto-generated method stub
-			getVisualization().cancel("force");
-			getVisualization().cancel("singleforce");
+			m_vis.cancel("force");
+			m_vis.cancel("singleforce");
 
 			System.out.println("Single force run");
-			getVisualization().run("singleforce");
+			m_vis.run("singleforce");
 
 		}
 
@@ -73,17 +77,17 @@ public class BlobVis extends Display {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 
-			getVisualization().cancel("force");
-			getVisualization().cancel("base");
+			m_vis.cancel("force");
+			m_vis.cancel("base");
 			if (paused) {
 				System.out.println("Restarting after pause");
-				getVisualization().run("force");
+				m_vis.run("force");
 				paused = false;
 			} else {
 				System.out.println("Pausing");
 				paused = true;
 			}
-			getVisualization().run("base");
+			m_vis.run("base");
 
 		}
 
@@ -95,7 +99,7 @@ public class BlobVis extends Display {
 		public void actionPerformed(ActionEvent arg0) {
 			hops += 1;
 			filter.setDistance(hops);
-			getVisualization().run("init");
+			m_vis.run("init");
 			System.out.println("Hops: " + hops);
 
 			/*
@@ -107,71 +111,21 @@ public class BlobVis extends Display {
 
 	}
 
-	public class ToggleGraphAction implements ActionListener {
-
-		@Override
-		public void actionPerformed(ActionEvent arg0) {
-			if ("hest".equals(curg)) {
-				readProgramAndDataAsGraph("ko");
-				curg = "ko";
-			} else if ("ko".equals(curg)) {
-				readProgramAndDataAsGraph("blob");
-				curg = "blob";
-			} else {
-				readProgramAndDataAsGraph("hest");
-				curg = "hest";
-			}
-			getVisualization().cancel("base");
-			getVisualization().cancel("init");
-			getVisualization().run("init");
-			getVisualization().run("base");
-
-		}
-
-	}
-
-	public class BlobTree extends Graph {
-
-		public void swap(Node r, int ci1, int ci2) {
-
-			/*
-			 * int c1r = r.getChild(ci1).getRow(); int c2r =
-			 * r.getChild(ci2).getRow(); System.out.println(c1r+" "+c2r); int
-			 * tmp = m_links.getInt(c1r,CHILDINDEX); m_links.setInt(c1r,
-			 * CHILDINDEX, m_links.getInt(c2r, CHILDINDEX) );
-			 * m_links.setInt(c2r, CHILDINDEX, tmp );
-			 */
-
-			Node c1 = r.getChild(ci1);
-			Edge e1 = g.getEdge(r, r.getChild(ci1));
-			g.removeEdge(e1);
-			g.addEdge(r, c1);
-
-			if (c1.canGet(BlobFuse.BLOBFIELD, Blob.class)) {
-				Blob b = (Blob) r.get(BlobFuse.BLOBFIELD);
-				b.swap(BondSite.North, BondSite.South);
-			}
-
-			// Edge e2 = g.getEdge(r, r.getChild(ci2));
-
-		}
-
-	}
-
 	public class SwitchAction implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Node r = g.getNode(0);
 
-			((BlobTree) g).swap(r, 0, 1);
-			getVisualization().cancel("init");
-			getVisualization().run("init");
+			System.out.println(r.get(BlobFuse.BLOBFIELD));
+
+			m_vis.cancel("init");
+			m_vis.run("init");
 		}
 
 	}
 
-	String curg = "hest";
+	
 	Node selected = null;
 	private static final String GRAPH = "graph";
 	private static final String EDGES = "graph.edges";
@@ -181,15 +135,20 @@ public class BlobVis extends Display {
 	private boolean tree = false;
 	int hops = 10;
 	final GraphDistanceFilter filter;
+	private Visualization m_vis;
 
 	public BlobVis(String filename) {
-		super(new Visualization());
+		super(new BorderLayout());
+		m_vis = new Visualization();
 
 		LabelRenderer tr = new LabelRenderer();
 		tr.setRoundedCorner(8, 8);
 
-		/*Renderer polyR = new AggregatePolygonRenderer(Constants.POLY_TYPE_CURVE);
-		((PolygonRenderer) polyR).setCurveSlack(0.15f);*/
+		/*
+		 * Renderer polyR = new
+		 * AggregatePolygonRenderer(Constants.POLY_TYPE_CURVE);
+		 * ((PolygonRenderer) polyR).setCurveSlack(0.15f);
+		 */
 		DefaultRendererFactory dfr = new DefaultRendererFactory(tr,
 				new BlobEdgeRenderer());
 		// dfr.add("ingroup('aggregates')", polyR);
@@ -218,10 +177,7 @@ public class BlobVis extends Display {
 		m_vis.putAction("singleforce", singleforce);
 
 		ActionList base = new ActionList(Action.INFINITY, 100);
-		/*
-		 * base.add(genColors()); //base.add(new AggregateLayout(AGGR));
-		 * base.add(new RepaintAction());
-		 */
+		base.add(genColors()); // base.add(new AggregateLayout(AGGR));
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(genColors());
@@ -236,29 +192,46 @@ public class BlobVis extends Display {
 		// m_vis.alwaysRunAfter("force", "base");
 
 		// m_vis.putAction("init", init);
-		// m_vis.putAction("base", base);
+		m_vis.putAction("base", base);
 		// set up the display
-		setSize(800, 800);
+		Display display = new Display(m_vis);
+		display.setSize(800, 800);
+		display.pan(150, 150);
+		display.setHighQuality(true);
+		display.setItemSorter(new TreeDepthItemSorter());
 
-		pan(150, 150);
-		setHighQuality(true);
-		setItemSorter(new TreeDepthItemSorter());
-
-		addControlListener(new BlobDragControl());
-		addControlListener(new FocusControl(1));
-		addControlListener(new PanControl());
-		addControlListener(new ZoomControl());
-		addControlListener(new WheelZoomControl());
-		addControlListener(new ZoomToFitControl());
+		display.addControlListener(new BlobDragControl());
+		display.addControlListener(new FocusControl(1));
+		display.addControlListener(new PanControl());
+		display.addControlListener(new ZoomControl());
+		display.addControlListener(new WheelZoomControl());
+		display.addControlListener(new ZoomToFitControl());
+		// create a panel for editing force values
+        ForceSimulator fsim = ((ForceDirectedLayout)force.get(1)).getForceSimulator();
+        JForcePanel fpanel = new JForcePanel(fsim);
+		
+		 JSplitPane split = new JSplitPane();
+	        split.setLeftComponent(display);
+	        split.setRightComponent(fpanel);
+	        split.setOneTouchExpandable(true);
+	        split.setContinuousLayout(false);
+	        split.setDividerLocation(-1);
+	        
+	        // now we run our action list
+	        m_vis.run("draw");
+	        
+	     add(split);
+		
 
 		// set things running
 		m_vis.run("init");
-		/* m_vis.run("base"); */
+		m_vis.run("base");
 
 		if (!paused) {
 			m_vis.run("force");
 		}
 
+		/*
 		registerKeyboardAction(new SwitchAction(), "switchit", KeyStroke
 				.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
 
@@ -270,6 +243,7 @@ public class BlobVis extends Display {
 
 		registerKeyboardAction(new SingleForceAction(), "singleforce",
 				KeyStroke.getKeyStroke("S"), WHEN_FOCUSED);
+		*/
 
 		System.out.println("NodeCount: " + g.getNodeCount());
 
@@ -320,8 +294,9 @@ public class BlobVis extends Display {
 			nStroke.setDefaultColor(ColorLib.gray(100));
 			nStroke.add("_hover", ColorLib.gray(50));
 
-			ColorAction nFill = new ColorAction(NODES, VisualItem.FILLCOLOR);
-			nFill.setDefaultColor(ColorLib.gray(255));
+			ColorAction nFill = new ColorAction(NODES, VisualItem.FILLCOLOR,
+					ColorLib.gray(255));
+
 			nFill.add("_hover", ColorLib.gray(100));
 			nFill.add(VisualItem.FIXED, ColorLib.rgb(255, 100, 100));
 			nFill.add(VisualItem.HIGHLIGHT, ColorLib.rgb(255, 200, 125));
@@ -338,22 +313,28 @@ public class BlobVis extends Display {
 			aStroke.setDefaultColor(ColorLib.gray(200));
 			aStroke.add("_hover", ColorLib.rgb(255, 100, 100));
 
-			int[] palette = new int[] { ColorLib.rgba(255, 200, 200, 150),
-					ColorLib.rgba(200, 255, 200, 150),
-					ColorLib.rgba(200, 200, 255, 150) };
-			ColorAction aFill = new DataColorAction(AGGR, "id",
-					Constants.NOMINAL, VisualItem.FILLCOLOR, palette);
+			ActionList colors = new ActionList();
+			
+			if (use_aggregate) {
+				int[] palette = new int[] { ColorLib.rgba(255, 200, 200, 150),
+						ColorLib.rgba(200, 255, 200, 150),
+						ColorLib.rgba(200, 200, 255, 150) };
+				ColorAction aFill = new DataColorAction(AGGR, "id",
+						Constants.NOMINAL, VisualItem.FILLCOLOR, palette);
+				colors.add(aFill);
+			}
 
 			// bundle the color actions
-			ActionList colors = new ActionList();
+			
 			colors.add(nStroke);
 			colors.add(nFill);
 			colors.add(nEdges);
 			colors.add(nEdgesText);
-			colors.add(new FontAction(EDGES, FontLib.getFont("SansSerif", Font.PLAIN, 8)));
+			colors.add(new FontAction(EDGES, FontLib.getFont("SansSerif",
+					Font.PLAIN, 8)));
 			colors.add(nText);
 			colors.add(aStroke);
-			colors.add(aFill);
+
 			col_cache = colors;
 			return colors;
 		} else {
@@ -368,7 +349,7 @@ public class BlobVis extends Display {
 		m_vis.removeGroup(GRAPH);
 		VisualGraph vg = m_vis.addGraph(GRAPH, g);
 		m_vis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
-		VisualItem f = (VisualItem) vg.getNode(0);
+		VisualItem f = (VisualItem) vg.getNode(0);// .getChild(1);
 		m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
 		f.setFixed(false);
 
@@ -378,13 +359,53 @@ public class BlobVis extends Display {
 
 	Graph g;
 	private Model m;
+	private boolean use_aggregate = false;
+
+	public void readProgramAndDataAsGraph(String filename) {
+		g = new Graph();
+		g.getNodeTable().addColumns(LABEL_SCHEMA);
+		g.addColumns(BlobFuse.BLOB_SCHEMA);
+		m = new Model();
+		m.readConfiguration(filename);
+		nodel = new HashMap<Blob, Node>();
+		nodelf = new ArrayList<Blob>();
+		dfsBlob(m.APB());
+		VisualGraph vg = setGraph(g);
+
+		if (use_aggregate) {
+			fillAggregates(vg);
+		}
+	}
 
 	@SuppressWarnings("unchecked")
-	public void readProgramAndDataAsGraph(String filename) {
-		g = new BlobTree();
-		g.getNodeTable().addColumns(LABEL_SCHEMA);
+	private void fillAggregates(VisualGraph vg) {
+		m_vis.removeGroup(AGGR);
+		AggregateTable at = m_vis.addAggregates(AGGR);
+		at.addColumn(VisualItem.POLYGON, float[].class);
+		at.addColumn("id", int.class);
 
-		if ("hest".equals(filename)) {
+		AggregateItem pgr = (AggregateItem) at.addItem();
+		pgr.setInt("id", 0);
+		AggregateItem data = (AggregateItem) at.addItem();
+		data.setInt("id", 1);
+
+		for (Iterator<VisualItem> iterator = vg.nodes(); iterator.hasNext();) {
+			VisualItem type = iterator.next();
+			if (type.canGet(BlobFuse.BLOBINPGR, Boolean.class)) {
+				boolean b = (Boolean) type.get(BlobFuse.BLOBINPGR);
+				if (b) {
+					pgr.addItem(type);
+				} else {
+					data.addItem(type);
+				}
+			} else {
+				System.out.println("No can get: " + type);
+			}
+		}
+	}
+
+	private String genGraph(String type) {
+		if ("hest".equals(type)) {
 			Node n = g.addNode();
 			n.setString(LABEL, "Node1");
 
@@ -399,7 +420,7 @@ public class BlobVis extends Display {
 			Node n3 = g.addNode();
 			g.addEdge(n1, n3);
 			n3.setString(LABEL, "Node1.1.1");
-		} else if ("ko".equals(filename)) {
+		} else if ("ko".equals(type)) {
 			Node n = g.addNode();
 			n.setString(LABEL, "KoNode1");
 
@@ -416,7 +437,7 @@ public class BlobVis extends Display {
 			g.addEdge(n1, n3);
 
 			n3.setString(LABEL, "KoNode1.1.1");
-		} else if ("blob".equals(filename)) {
+		} else if ("blob".equals(type)) {
 			g.addColumns(BlobFuse.BLOB_SCHEMA);
 			Blob pb1 = new Blob(1);
 			Blob pb2 = new Blob(2);
@@ -445,44 +466,8 @@ public class BlobVis extends Display {
 			nodelf = new ArrayList<Blob>();
 			dfsBlob(pb1);
 
-		} else {
-			g.addColumns(BlobFuse.BLOB_SCHEMA);
-			m = new Model();
-			m.readConfiguration(filename);
-			nodel = new HashMap<Blob, Node>();
-			nodelf = new ArrayList<Blob>();
-			dfsBlob(m.APB());
-			filename = "blob";
 		}
-
-		VisualGraph vg = setGraph(g);
-		if ("blob".equals(filename)) {
-			m_vis.removeGroup(AGGR);
-			AggregateTable at = m_vis.addAggregates(AGGR);
-			at.addColumn(VisualItem.POLYGON, float[].class);
-			at.addColumn("id", int.class);
-
-			AggregateItem pgr = (AggregateItem) at.addItem();
-			pgr.setInt("id", 0);
-			AggregateItem data = (AggregateItem) at.addItem();
-			data.setInt("id", 1);
-
-			for (Iterator<VisualItem> iterator = vg.nodes(); iterator.hasNext();) {
-				VisualItem type = iterator.next();
-
-				if (type.canGet(BlobFuse.BLOBINPGR, Boolean.class)) {
-					boolean b = (Boolean) type.get(BlobFuse.BLOBINPGR);
-					if (b) {
-						pgr.addItem(type);
-					} else {
-						data.addItem(type);
-					}
-				} else {
-					System.out.println("No can get: " + type);
-				}
-			}
-		}
-
+		return type;
 	}
 
 	Map<Blob, Node> nodel;
@@ -505,9 +490,9 @@ public class BlobVis extends Display {
 			n.set(BlobFuse.BLOBINPGR, inpgr);
 			for (int i = 3; i >= 0; i--) {
 				Blob bn = cur.follow(BondSite.create(i));
-				
+
 				if (bn != null) {
-					
+
 					Node nn = null;
 					if (!nodel.containsKey(bn)) {
 						if (i == 0 && inpgr) {
@@ -519,10 +504,10 @@ public class BlobVis extends Display {
 					}
 					if (nn != null) {
 						Edge e = g.addEdge(n, nn);
-						e.set(BlobFuse.EDGENUMBERSRC,i );
+						e.set(BlobFuse.EDGENUMBERSRC, i);
 						BondSite otherend = bn.boundTo(cur);
-						if (otherend != null)						
-							e.set(BlobFuse.EDGENUMBERTAR,otherend.ordinal() );
+						if (otherend != null)
+							e.set(BlobFuse.EDGENUMBERTAR, otherend.ordinal());
 					}
 				}
 			}

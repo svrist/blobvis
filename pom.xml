@@ -9,7 +9,7 @@
   <url>http://maven.apache.org</url>
 
   <build>
-  <plugins>
+    <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -18,6 +18,42 @@
           <source>1.6</source>
           <target>1.6</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>2.2-beta-5</version>
+        <executions>
+          <execution>
+            <id>make-ass</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <archive>
+            <manifest>
+              <mainClass>dk.diku.blob.blobvis.BlobVis</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.2</version>
+        <configuration>
+          <tasks>
+            <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" 
+              toFile="${dropbox.public.dir}/${blob.dir}/${blob.jar}" />
+          </tasks>
+            </configuration>
       </plugin>
     </plugins>
 
@@ -35,10 +71,10 @@
       <artifactId>simulator</artifactId>
       <version>1.0-SNAPSHOT</version>
     </dependency>
-  <dependency>
-    <groupId>org.prefuse</groupId>
-    <artifactId>prefuse</artifactId>
-    <version>beta</version>
-  </dependency>
+    <dependency>
+      <groupId>org.prefuse</groupId>
+      <artifactId>prefuse</artifactId>
+      <version>beta</version>
+    </dependency>
   </dependencies>
 </project>

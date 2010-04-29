@@ -104,7 +104,7 @@ class BlobDragControl extends ControlAdapter {
 		down.setLocation(temp);
 	}
 
-	@SuppressWarnings("unchecked")
+	
 	protected static void setFixed(VisualItem item, boolean fixed) {
 		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
@@ -116,7 +116,7 @@ class BlobDragControl extends ControlAdapter {
 		/*}*/
 	}
 
-	@SuppressWarnings("unchecked")
+	
 	protected static void move(VisualItem item, double dx, double dy) {
 		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
