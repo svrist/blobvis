@@ -50,7 +50,6 @@ import prefuse.util.force.ForceSimulator;
 import prefuse.util.ui.JForcePanel;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
-import prefuse.visual.NodeItem;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
 import prefuse.visual.sort.TreeDepthItemSorter;
@@ -119,29 +118,81 @@ public class BlobVis extends JPanel {
 		public void actionPerformed(ActionEvent e) {
 			Node r = g.getSpanningTree().getRoot();
 			Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
-			System.out.println(apb.opCode() + ": " + apb.getCargo());
+			Blob adb = apb.follow(BondSite.North);
 			BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-
+			System.out.println("Adb: "+adb+" b:"+b+" apb:"+apb+" m("+m.APB()+","+m.ADB()+")");
+			
+			Node adbn = findNode(r,adb);
+			Node adbnnext = findNode(r,adb);
+			
 			r.set(BlobFuse.BLOBTYPE, 3);
 			if (apb.opCode().startsWith("JB")) {
 				if (m.ADB().follow(b) != null) {
 					b = BondSite.South;
+					System.out.println("Going south");
 				} else {
+					System.out.println("Nothing on "+m.ADB()+"."+b+" going west("+m.ADB().follow(BondSite.East)+m.ADB().follow(BondSite.South)+m.ADB().follow(BondSite.West)+") - "+adb);
 					b = BondSite.West;
 				}
-				Blob next = apb.follow(b);
+			}else if (apb.opCode().startsWith("CHD")){
+				adb = m.ADB().follow(b);
+				//g.removeEdge(g.getEdge)
+				adbnnext = findNode(adbn,adb);
+				b = BondSite.South;
 			} else {
 				b = BondSite.South;
 			}
 
-			Node nn = (Node) r.get(BlobFuse.BLOBBS + b.ordinal());
-			nn.set(BlobFuse.BLOBTYPE, 1);
-			g.getSpanningTree((Node) nn);
-			m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(nn);
-			System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS).getTupleCount());
+			Blob next = apb.follow(b);
+			
+			
+			Node nn = findNode(r, next);
+			updateTheBug(r,nn,adbn,adbnnext);
+			stepModel(r,nn);
+			
 
-			m.step();
+		}
 
+		private void updateTheBug(Node r, Node nn,Node adbncur,Node adbnnext) {
+			System.out.println("Remove: "+g.removeEdge(g.getEdge(r,adbncur)));
+			if (g.getEdge(adbncur,r)!=null){
+				System.out.println("Remove: "+g.removeEdge(g.getEdge(adbncur,r)));
+			}
+			adbncur.set(BlobFuse.BLOBTYPE,4);
+			adbnnext.set(BlobFuse.BLOBTYPE,2);
+			Edge thebug = g.addEdge(nn, adbnnext);
+			thebug.set(BlobFuse.EDGENUMBERSRC, 0);
+			thebug.set(BlobFuse.EDGENUMBERTAR, 0);
+		}
+
+		private void stepModel(Node r, Node nn) {
+
+			if (nn != null) {
+				VisualItem vnn = (VisualItem)vg.getNode(nn.getRow());	
+				nn.set(BlobFuse.BLOBTYPE, 1);
+				//vg.getSpanningTree((Node)vnn);
+				g.getSpanningTree(nn);
+				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
+				System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS)
+						.getTupleCount());
+
+				m.step();
+			} else {
+				throw new RuntimeException("Failed to find the child successor");
+			}
+		}
+
+		private Node findNode(Node r, Blob next) {
+			Node nn = null;
+			for (int i = 0; i < r.getChildCount(); i++) {
+				nn = (Node) r.getChild(i);
+				Blob tmp = (Blob) nn.get(BlobFuse.BLOBFIELD);
+				if (tmp == next)
+					break;
+				else
+					nn = null;
+			}
+			return nn;
 		}
 
 	}
@@ -153,7 +204,7 @@ public class BlobVis extends JPanel {
 	private static final String AGGR = "aggregates";
 	Layout lay;
 	private boolean tree = false;
-	int hops = 10;
+	int hops = 3;
 	final GraphDistanceFilter filter;
 	private Visualization m_vis;
 
@@ -379,8 +430,8 @@ public class BlobVis extends JPanel {
 		m_vis.removeGroup(GRAPH);
 		VisualGraph vg = m_vis.addGraph(GRAPH, g);
 		m_vis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
-		VisualItem f = (VisualItem) vg.getNode(0); 
-				// .getChild(1);
+		VisualItem f = (VisualItem) vg.getNode(0);
+		// .getChild(1);
 		m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
 		f.setFixed(false);
 
@@ -513,7 +564,7 @@ public class BlobVis extends JPanel {
 		Blob cur = pb1;
 
 		if (!nodel.containsKey(cur)) {
-			Node n = vg.addNode();
+			Node n = g.addNode();
 			nodel.put(cur, n);
 
 			if (m.APB().equals(cur)) {
@@ -534,7 +585,6 @@ public class BlobVis extends JPanel {
 				n.setString(LABEL, "" + cur.getCargo());
 			}
 			n.set(BlobFuse.BLOBINPGR, inpgr);
-			int cidx = 0;
 			for (int i = 3; i >= 0; i--) {
 				Blob bn = cur.follow(BondSite.create(i));
 
@@ -550,17 +600,12 @@ public class BlobVis extends JPanel {
 						nn = nodel.get(bn);
 					}
 					if (nn != null) {
-						Edge e = vg.addEdge(n, nn);
-						n.set(BlobFuse.BLOBBS + i, nn);
-						cidx++;
-
+						Edge e = g.addEdge(n, nn);
 						e.set(BlobFuse.EDGENUMBERSRC, i);
 						BondSite otherend = bn.boundTo(cur);
 						if (otherend != null) {
 							e.set(BlobFuse.EDGENUMBERTAR, otherend.ordinal());
-							System.out.println(otherend + " " + (n == null)
-									+ " " + (nn == null));
-							nn.set(BlobFuse.BLOBBS + (otherend.ordinal()), n);
+							
 						}
 					}
 				}
