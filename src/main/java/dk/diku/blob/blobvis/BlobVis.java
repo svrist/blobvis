@@ -116,8 +116,7 @@ public class BlobVis extends JPanel {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			
-			
+
 			Node r = g.getSpanningTree().getRoot();
 			Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
 			Blob adb = apb.follow(BondSite.North);
@@ -146,7 +145,6 @@ public class BlobVis extends JPanel {
 				adb = m.ADB().follow(b);
 				// g.removeEdge(g.getEdge)
 				adbnnext = findNode(adbn, adb);
-				apbBsNext = BondSite.South;
 			} else if (apb.opCode().startsWith("SBS")) {
 				BondSite b1 = BondSite
 						.create(((8 + 4) & m.APB().getCargo()) / 4);
@@ -159,7 +157,7 @@ public class BlobVis extends JPanel {
 				if (bb2 != null) {
 					setSrcBondSite(adbn, bb2, b1);
 				}
-				apbBsNext = BondSite.South;
+
 			} else if (apb.opCode().startsWith("JN")) {
 				BondSite b1 = BondSite
 						.create(((8 + 4) & m.APB().getCargo()) / 4);
@@ -183,54 +181,107 @@ public class BlobVis extends JPanel {
 						}
 					}
 				}
+			} else if (apb.opCode().startsWith("SWL")) {
+				BondSite b1 = BondSite
+						.create(((8 + 4) & m.APB().getCargo()) / 4);
+				BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
+
+				Blob adb_b1 = m.ADB().follow(b1);
+				Node adb_b1n = null;
+				BondSite ts2 = null;
+				if (adb_b1 != null) {
+					ts2 = adb_b1.boundTo(m.ADB());
+					adb_b1n = findNode(adbn, adb_b1);
+				}
+				Blob adb_b2 = m.ADB().follow(b2);
+				Blob adb_b2_b1 = null;
+				if (adb_b2 != null) {
+					adb_b2_b1 = adb_b2.follow(b1);
+					Node adb_b2n = findNode(adbn, adb_b2);
+					if (adb_b2_b1 != null) {
+						BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
+						// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
+						Node adb_b2_b1n = findNode(adb_b2n, adb_b2_b1);
+						linkNodes(adbn, b1, adb_b2_b1n, ts1);
+
+						if (adb_b1 != null) {
+							// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
+							linkNodes(adb_b2n, b1, adb_b1n, ts2);
+							// case 4: something(x) on b1 and something(y) on
+							// b2.b1 -> b1=y, b2.b1=x
+						} else {
+							System.out.println("Case 2");
+							// Case 2: Nothing on b1 and something(x) on b2.b1
+							// -> b2.b1=null,b1=x
+							// TODO: adb_b2.unlink( b1 );
+							removeEdge(adb_b2n, adb_b2_b1n);
+						}
+					} else if (adb_b1 != null) {
+						// case 3: Something(x) on b1 and nothing on b2.b1 ->
+						// b2.b1=x,b1=nothing
+						// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
+						linkNodes(adb_b2n, b1, adb_b1n, ts2);
+						// TODO: ADB.unlink( b1 );
+						removeEdge(adbn, adb_b1n);
+					} else {
+						System.out.println("Case 6");
+						// case 6: Nothing on b1 and nothing on b2.b1 -> nothing
+						// happens
+					}
+				} else if (adb_b1 != null) {
+					// case 5: something(x) on b1 and nothing on b2 -> b1=null,
+					// x disappers
+					// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
+					removeEdge(adbn, adb_b1n);
+				} else {
+					// Case 1: Nothing on b1 and nothing on b2 -> nothing
+					// happens
+				}
 			} else {
 				apbBsNext = BondSite.South;
 			}
 
 			Blob next = apb.follow(apbBsNext);
+			System.out.println(next.opCode());
+			System.out.println(r);
 			Node nn = findNode(r, next);
 			updateTheBug(r, nn, adbn, adbnnext);
 			stepModel(r, nn);
-			
-			
-			
 
 		}
 
-		private void linkNodes(Node adbn, BondSite b1, Node destn, BondSite ds) {
+		private void linkNodes(Node n1, BondSite b1, Node n2, BondSite b2) {
 			// loop over adb/dest edges.
 			// Remove all with src/tar of b1/ds
 			// link adb with dest. Set src=b1, tar=ds
-
-			Iterator i = adbn.childEdges();
-			System.out.println("Adb: " + adbn);
-			List<Edge> rems = gatherRemoveList(b1, adbn);
-			System.out.println("dstn: " + destn);
-			rems.addAll(gatherRemoveList(ds,destn));
-
-			for (Iterator it = rems.iterator(); it.hasNext();) {
-				Edge edge = (Edge) it.next();
+			System.out.println("Adb: " + n1);
+			List<Edge> rems = gatherRemoveList(b1, n1);
+			System.out.println("dstn: " + n2);
+			rems.addAll(gatherRemoveList(b2, n2));
+			for (Edge element : rems) {
+				Edge edge = element;
 				g.removeEdge(edge);
 			}
-			Edge ne = g.addEdge(adbn, destn);
+			Edge ne = g.addEdge(n1, n2);
 			ne.set(BlobFuse.EDGENUMBERSRC, b1.ordinal());
-			ne.set(BlobFuse.EDGENUMBERTAR, ds.ordinal());
+			ne.set(BlobFuse.EDGENUMBERTAR, b2.ordinal());
 			System.out.println("Added ne: " + ne);
 		}
 
-		private List<Edge> gatherRemoveList(BondSite needle,
-				Node n) {
+		@SuppressWarnings("unchecked")
+		private List<Edge> gatherRemoveList(BondSite needle, Node n) {
 			List<Edge> rems = new ArrayList<Edge>();
 			Iterator removeIterator = n.edges();
 			while (removeIterator.hasNext()) {
 				Edge ce = (Edge) removeIterator.next();
-				String field = ce.getSourceNode()==n?BlobFuse.EDGENUMBERSRC:BlobFuse.EDGENUMBERTAR;
-				String field2 = ce.getSourceNode()!=n?BlobFuse.EDGENUMBERSRC:BlobFuse.EDGENUMBERTAR;
+				String field = ce.getSourceNode() == n ? BlobFuse.EDGENUMBERSRC
+						: BlobFuse.EDGENUMBERTAR;
+				String field2 = ce.getSourceNode() != n ? BlobFuse.EDGENUMBERSRC
+						: BlobFuse.EDGENUMBERTAR;
 				int bsi = (Integer) ce.get(field);
 				int tar = (Integer) ce.get(field2);
-				System.out.println("edge: " + bsi + "->"
-						+ tar+ " == " + needle
-						+ "." + needle.ordinal());
+				System.out.println("edge: " + bsi + "->" + tar + " == "
+						+ needle + "." + needle.ordinal());
 				if (bsi == needle.ordinal()) {
 					rems.add(ce);
 				}
@@ -241,31 +292,39 @@ public class BlobVis extends JPanel {
 		private void setSrcBondSite(Node srcn, Blob target, BondSite newvalue) {
 			Node bbn1 = findNode(srcn, target);
 			Edge e1 = g.getEdge(srcn, bbn1);
-			if (e1!=null){
+			if (e1 != null) {
 				e1.set(BlobFuse.EDGENUMBERSRC, newvalue.ordinal());
-			}else{
-				e1= g.getEdge(bbn1,srcn);
+			} else {
+				e1 = g.getEdge(bbn1, srcn);
 				e1.set(BlobFuse.EDGENUMBERTAR, newvalue.ordinal());
 			}
 
 		}
 
 		private void updateTheBug(Node r, Node nn, Node adbncur, Node adbnnext) {
+
+			Edge thebug = g.addEdge(nn, adbnnext);
 			removeEdge(r, adbncur);
 			adbncur.set(BlobFuse.BLOBTYPE, 4);
 			adbnnext.set(BlobFuse.BLOBTYPE, 2);
-			Edge thebug = g.addEdge(nn, adbnnext);
+			System.out.println(nn + " -> " + adbnnext);
+
 			thebug.set(BlobFuse.EDGENUMBERSRC, 0);
 			thebug.set(BlobFuse.EDGENUMBERTAR, 0);
 		}
 
-		private void removeEdge(Node r, Node adbncur) {
-			Edge e1 = g.getEdge(r, adbncur);
-			Edge e2 = g.getEdge(adbncur, r);
+		private void removeEdge(Node n1, Node n2) {
+			System.out.println("n1: " + n1 + " n2:" + n2);
+			Edge e1 = g.getEdge(n1, n2);
+			Edge e2 = g.getEdge(n2, n1);
 			if (e1 != null) {
+				System.out.println("Removing " + e1 + " " + e1.getSourceNode()
+						+ "->" + e1.getTargetNode());
 				g.removeEdge(e1);
 			}
 			if (e2 != null) {
+				System.out.println("Removing " + e2 + " " + e2.getSourceNode()
+						+ "->" + e2.getTargetNode());
 				g.removeEdge(e2);
 			}
 		}
@@ -289,13 +348,39 @@ public class BlobVis extends JPanel {
 
 		private Node findNode(Node r, Blob next) {
 			Node nn = null;
-			for (int i = 0; i < r.getChildCount(); i++) {
-				nn = (Node) r.getChild(i);
+
+			Iterator ed = r.edges();
+			while (ed.hasNext()) {
+				Edge e = (Edge) ed.next();
+				if (e.getSourceNode() == r) {
+					nn = e.getTargetNode();
+				} else {
+					nn = e.getSourceNode();
+				}
 				Blob tmp = (Blob) nn.get(BlobFuse.BLOBFIELD);
 				if (tmp == next)
 					break;
 				else
 					nn = null;
+			}
+			if (nn == null) {
+				StringBuffer sb = new StringBuffer();
+				ed = r.edges();
+				while (ed.hasNext()) {
+					Edge e = (Edge) ed.next();
+					if (e.getSourceNode() == r) {
+						nn = e.getTargetNode();
+					} else {
+						nn = e.getSourceNode();
+					}
+					sb.append(nn);
+					sb.append(",");
+				}
+				Blob rb = (Blob) r.get(BlobFuse.BLOBFIELD);
+				throw new RuntimeException("Failed to find " + next + "("
+						+ next.opCode() + ") as a child from " + r + "(" + rb
+						+ "," + rb.opCode() + ")\nChildCount:"
+						+ r.getChildCount() + ": " + sb.toString());
 			}
 			return nn;
 		}
@@ -351,9 +436,6 @@ public class BlobVis extends JPanel {
 		singleforce.add(genColors());
 		singleforce.add(new RepaintAction());
 		m_vis.putAction("singleforce", singleforce);
-		
-
-        
 
 		ActionList base = new ActionList(Action.INFINITY, 100);
 		base.add(filter);
