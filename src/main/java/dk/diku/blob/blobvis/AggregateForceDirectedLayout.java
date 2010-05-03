@@ -90,7 +90,6 @@ public class AggregateForceDirectedLayout extends ForceDirectedLayout {
 		super.setY(item, referrer, y);
 
 	}
-	@SuppressWarnings("unchecked")
 	protected void movess(VisualItem item, double dx, double dy) {
 		if (dx == 0 && dy ==0)
 			return;

@@ -46,8 +46,6 @@ import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.FontLib;
-import prefuse.util.force.ForceSimulator;
-import prefuse.util.ui.JForcePanel;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
@@ -56,20 +54,8 @@ import prefuse.visual.sort.TreeDepthItemSorter;
 
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
-	public class SingleForceAction implements ActionListener {
+	private boolean ended = true;
 
-		@Override
-		public void actionPerformed(ActionEvent arg0) {
-			// TODO Auto-generated method stub
-			m_vis.cancel("force");
-			m_vis.cancel("singleforce");
-
-			System.out.println("Single force run");
-			m_vis.run("singleforce");
-
-		}
-
-	}
 
 	boolean paused = false;
 
@@ -100,8 +86,6 @@ public class BlobVis extends JPanel {
 		public void actionPerformed(ActionEvent arg0) {
 			hops += 1;
 			filter.setDistance(hops);
-			m_vis.run("init");
-			System.out.println("Hops: " + hops);
 
 			/*
 			 * getVisualization().cancel("force");
@@ -114,139 +98,159 @@ public class BlobVis extends JPanel {
 
 	public class SwitchAction implements ActionListener {
 
+
+
 		@Override
 		public void actionPerformed(ActionEvent e) {
 
-			Node r = g.getSpanningTree().getRoot();
-			Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
-			Blob adb = apb.follow(BondSite.North);
-			BondSite apbBsNext = BondSite.South;
-			System.out.println("Adb: " + adb + " b:" + apbBsNext + " apb:"
-					+ apb + " m(" + m.APB() + "," + m.ADB() + ")");
-
-			Node adbn = findNode(r, adb);
-			Node adbnnext = findNode(r, adb);
-
-			r.set(BlobFuse.BLOBTYPE, 3);
-			if (apb.opCode().startsWith("JB")) {
-				BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-				if (m.ADB().follow(b) != null) {
-					apbBsNext = BondSite.South;
-					System.out.println("Going south");
-				} else {
-					System.out.println("Nothing on " + m.ADB() + "." + b
-							+ " going west(" + m.ADB().follow(BondSite.East)
-							+ m.ADB().follow(BondSite.South)
-							+ m.ADB().follow(BondSite.West) + ") - " + adb);
-					apbBsNext = BondSite.West;
-				}
-			} else if (apb.opCode().startsWith("CHD")) {
-				BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-				adb = m.ADB().follow(b);
-				// g.removeEdge(g.getEdge)
-				adbnnext = findNode(adbn, adb);
-			} else if (apb.opCode().startsWith("SBS")) {
-				BondSite b1 = BondSite
-						.create(((8 + 4) & m.APB().getCargo()) / 4);
-				BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
-				Blob bb1 = adb.follow(b1);
-				Blob bb2 = adb.follow(b2);
-				if (bb1 != null) {
-					setSrcBondSite(adbn, bb1, b2);
-				}
-				if (bb2 != null) {
-					setSrcBondSite(adbn, bb2, b1);
+			synchronized (m_vis) {
+				if (ended){
+					System.out.println("At EXT. Done");
+					return;
 				}
 
-			} else if (apb.opCode().startsWith("JN")) {
-				BondSite b1 = BondSite
-						.create(((8 + 4) & m.APB().getCargo()) / 4);
-				BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
-				Blob dest1 = adb.follow(b1);
-				Node dest1n = findNode(adbn, dest1);
-				Blob dest = dest1.follow(b2);
-				Node destn = findNode(dest1n, dest);
-				if (dest != null) {
-					BondSite ds = dest.boundTo(dest1);
-					linkNodes(adbn, b1, destn, ds);
-				} else {
-					Node n = findNode(adbn, dest1);
-					Edge ne = g.getEdge(adbn, n);
-					if (ne != null) {
-						g.removeEdge(ne);
-						ne = g.getEdge(n, adbn);
+				Node r = g.getSpanningTree().getRoot();
+				Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
+				Blob adb = apb.follow(BondSite.North);
+				BondSite apbBsNext = BondSite.South;
+
+				/*System.out.println("Adb: " + adb + " b:" + apbBsNext + " apb:"
+						+ apb + " m(" + m.APB() + "," + m.ADB() + ")");*/
+
+
+				Node adbn = findNode(r, adb);
+				Node adbnnext = findNode(r, adb);
+
+				r.set(BlobFuse.BLOBTYPE, 3);
+				if (apb.opCode().startsWith("JB")) {
+					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+					if (m.ADB().follow(b) != null) {
+						apbBsNext = BondSite.South;
+						/*System.out.println("Going south");*/
+					} else {
+						/*System.out.println("Nothing on " + m.ADB() + "." + b
+								+ " going west(" + m.ADB().follow(BondSite.East)
+								+ m.ADB().follow(BondSite.South)
+								+ m.ADB().follow(BondSite.West) + ") - " + adb);*/
+						apbBsNext = BondSite.West;
+					}
+				} else if (apb.opCode().startsWith("CHD")) {
+					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+					adb = m.ADB().follow(b);
+					// g.removeEdge(g.getEdge)
+					adbnnext = findNode(adbn, adb);
+				} else if (apb.opCode().startsWith("SBS")) {
+					BondSite b1 = BondSite
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
+					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
+					Blob bb1 = adb.follow(b1);
+					Blob bb2 = adb.follow(b2);
+					if (bb1 != null) {
+						setSrcBondSite(adbn, bb1, b2);
+					}
+					if (bb2 != null) {
+						setSrcBondSite(adbn, bb2, b1);
+					}
+
+				} else if (apb.opCode().startsWith("JN")) {
+					BondSite b1 = BondSite
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
+					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
+
+					Blob dest1 = adb.follow(b1);
+					Node dest1n = findNode(adbn, dest1);
+					Blob dest = dest1.follow(b2);
+					Node destn = findNode(dest1n, dest);
+					if (dest != null) {
+						BondSite ds = dest.boundTo(dest1);
+						linkNodes(adbn, b1, destn, ds);
+					} else {
+						Node n = findNode(adbn, dest1);
+						Edge ne = g.getEdge(adbn, n);
 						if (ne != null) {
 							g.removeEdge(ne);
+							ne = g.getEdge(n, adbn);
+							if (ne != null) {
+								g.removeEdge(ne);
+							}
 						}
 					}
-				}
-			} else if (apb.opCode().startsWith("SWL")) {
-				BondSite b1 = BondSite
-						.create(((8 + 4) & m.APB().getCargo()) / 4);
-				BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
+				} else if (apb.opCode().startsWith("SWL")) {
+					BondSite b1 = BondSite
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
+					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
-				Blob adb_b1 = m.ADB().follow(b1);
-				Node adb_b1n = null;
-				BondSite ts2 = null;
-				if (adb_b1 != null) {
-					ts2 = adb_b1.boundTo(m.ADB());
-					adb_b1n = findNode(adbn, adb_b1);
-				}
-				Blob adb_b2 = m.ADB().follow(b2);
-				Blob adb_b2_b1 = null;
-				if (adb_b2 != null) {
-					adb_b2_b1 = adb_b2.follow(b1);
-					Node adb_b2n = findNode(adbn, adb_b2);
-					if (adb_b2_b1 != null) {
-						BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
-						// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
-						Node adb_b2_b1n = findNode(adb_b2n, adb_b2_b1);
-						linkNodes(adbn, b1, adb_b2_b1n, ts1);
+					Blob adb_b1 = m.ADB().follow(b1);
+					Node adb_b1n = null;
+					BondSite ts2 = null;
+					if (adb_b1 != null) {
+						ts2 = adb_b1.boundTo(m.ADB());
+						adb_b1n = findNode(adbn, adb_b1);
+					}
+					Blob adb_b2 = m.ADB().follow(b2);
+					Blob adb_b2_b1 = null;
+					if (adb_b2 != null) {
+						adb_b2_b1 = adb_b2.follow(b1);
+						Node adb_b2n = findNode(adbn, adb_b2);
+						if (adb_b2_b1 != null) {
+							BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
+							// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
+							Node adb_b2_b1n = findNode(adb_b2n, adb_b2_b1);
+							linkNodes(adbn, b1, adb_b2_b1n, ts1);
 
-						if (adb_b1 != null) {
-							// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
+							if (adb_b1 != null) {
+								// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
+								linkNodes(adb_b2n, b1, adb_b1n, ts2);
+								// case 4: something(x) on b1 and something(y) on
+								// b2.b1 -> b1=y, b2.b1=x
+							} else {
+
+								// Case 2: Nothing on b1 and something(x) on b2.b1
+								// -> b2.b1=null,b1=x
+								// TODO: adb_b2.unlink( b1 );
+								removeEdge(adb_b2n, adb_b2_b1n);
+							}
+						} else if (adb_b1 != null) {
+							// case 3: Something(x) on b1 and nothing on b2.b1 ->
+							// b2.b1=x,b1=nothing
+							// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
 							linkNodes(adb_b2n, b1, adb_b1n, ts2);
-							// case 4: something(x) on b1 and something(y) on
-							// b2.b1 -> b1=y, b2.b1=x
+							// TODO: ADB.unlink( b1 );
+							removeEdge(adbn, adb_b1n);
 						} else {
-							System.out.println("Case 2");
-							// Case 2: Nothing on b1 and something(x) on b2.b1
-							// -> b2.b1=null,b1=x
-							// TODO: adb_b2.unlink( b1 );
-							removeEdge(adb_b2n, adb_b2_b1n);
+							/*System.out.println("Case 6");*/
+							// case 6: Nothing on b1 and nothing on b2.b1 -> nothing
+							// happens
 						}
 					} else if (adb_b1 != null) {
-						// case 3: Something(x) on b1 and nothing on b2.b1 ->
-						// b2.b1=x,b1=nothing
-						// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
-						linkNodes(adb_b2n, b1, adb_b1n, ts2);
-						// TODO: ADB.unlink( b1 );
+						// case 5: something(x) on b1 and nothing on b2 -> b1=null,
+						// x disappers
+						// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
 						removeEdge(adbn, adb_b1n);
 					} else {
-						System.out.println("Case 6");
-						// case 6: Nothing on b1 and nothing on b2.b1 -> nothing
+						// Case 1: Nothing on b1 and nothing on b2 -> nothing
 						// happens
 					}
-				} else if (adb_b1 != null) {
-					// case 5: something(x) on b1 and nothing on b2 -> b1=null,
-					// x disappers
-					// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
-					removeEdge(adbn, adb_b1n);
 				} else {
-					// Case 1: Nothing on b1 and nothing on b2 -> nothing
-					// happens
+					apbBsNext = BondSite.South;
 				}
-			} else {
-				apbBsNext = BondSite.South;
-			}
 
-			Blob next = apb.follow(apbBsNext);
-			System.out.println(next.opCode());
-			System.out.println(r);
-			Node nn = findNode(r, next);
-			updateTheBug(r, nn, adbn, adbnnext);
-			stepModel(r, nn);
+				Blob next = apb.follow(apbBsNext);
+				Node nn = findNode(r, next);
+				updateTheBug(r, nn, adbn, adbnnext);
+				stepModel(r, nn);
+
+				if (next.opCode().equals("EXT")){
+					ended =true;
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					m_vis.cancel("force");
+				}
+			};
 
 		}
 
@@ -254,9 +258,9 @@ public class BlobVis extends JPanel {
 			// loop over adb/dest edges.
 			// Remove all with src/tar of b1/ds
 			// link adb with dest. Set src=b1, tar=ds
-			System.out.println("Adb: " + n1);
+			//System.out.println("Adb: " + n1);
 			List<Edge> rems = gatherRemoveList(b1, n1);
-			System.out.println("dstn: " + n2);
+			//System.out.println("dstn: " + n2);
 			rems.addAll(gatherRemoveList(b2, n2));
 			for (Edge element : rems) {
 				Edge edge = element;
@@ -265,7 +269,7 @@ public class BlobVis extends JPanel {
 			Edge ne = g.addEdge(n1, n2);
 			ne.set(BlobFuse.EDGENUMBERSRC, b1.ordinal());
 			ne.set(BlobFuse.EDGENUMBERTAR, b2.ordinal());
-			System.out.println("Added ne: " + ne);
+			//System.out.println("Added ne: " + ne);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -280,8 +284,8 @@ public class BlobVis extends JPanel {
 						: BlobFuse.EDGENUMBERTAR;
 				int bsi = (Integer) ce.get(field);
 				int tar = (Integer) ce.get(field2);
-				System.out.println("edge: " + bsi + "->" + tar + " == "
-						+ needle + "." + needle.ordinal());
+				/*System.out.println("edge: " + bsi + "->" + tar + " == "
+					+ needle + "." + needle.ordinal());*/
 				if (bsi == needle.ordinal()) {
 					rems.add(ce);
 				}
@@ -307,24 +311,24 @@ public class BlobVis extends JPanel {
 			removeEdge(r, adbncur);
 			adbncur.set(BlobFuse.BLOBTYPE, 4);
 			adbnnext.set(BlobFuse.BLOBTYPE, 2);
-			System.out.println(nn + " -> " + adbnnext);
+			/*System.out.println(nn + " -> " + adbnnext);*/
 
 			thebug.set(BlobFuse.EDGENUMBERSRC, 0);
 			thebug.set(BlobFuse.EDGENUMBERTAR, 0);
 		}
 
 		private void removeEdge(Node n1, Node n2) {
-			System.out.println("n1: " + n1 + " n2:" + n2);
+			//System.out.println("n1: " + n1 + " n2:" + n2);
 			Edge e1 = g.getEdge(n1, n2);
 			Edge e2 = g.getEdge(n2, n1);
 			if (e1 != null) {
-				System.out.println("Removing " + e1 + " " + e1.getSourceNode()
-						+ "->" + e1.getTargetNode());
+				/*System.out.println("Removing " + e1 + " " + e1.getSourceNode()
+						+ "->" + e1.getTargetNode());*/
 				g.removeEdge(e1);
 			}
 			if (e2 != null) {
-				System.out.println("Removing " + e2 + " " + e2.getSourceNode()
-						+ "->" + e2.getTargetNode());
+				/*System.out.println("Removing " + e2 + " " + e2.getSourceNode()
+						+ "->" + e2.getTargetNode());*/
 				g.removeEdge(e2);
 			}
 		}
@@ -337,8 +341,8 @@ public class BlobVis extends JPanel {
 				// vg.getSpanningTree((Node)vnn);
 				g.getSpanningTree(nn);
 				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
-				System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS)
-						.getTupleCount());
+				/*System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS)
+					.getTupleCount());*/
 
 				m.step();
 			} else {
@@ -346,12 +350,13 @@ public class BlobVis extends JPanel {
 			}
 		}
 
+		@SuppressWarnings("unchecked")
 		private Node findNode(Node r, Blob next) {
 			Node nn = null;
 
-			Iterator ed = r.edges();
+			Iterator<Edge> ed = r.edges();
 			while (ed.hasNext()) {
-				Edge e = (Edge) ed.next();
+				Edge e = ed.next();
 				if (e.getSourceNode() == r) {
 					nn = e.getTargetNode();
 				} else {
@@ -367,7 +372,7 @@ public class BlobVis extends JPanel {
 				StringBuffer sb = new StringBuffer();
 				ed = r.edges();
 				while (ed.hasNext()) {
-					Edge e = (Edge) ed.next();
+					Edge e = ed.next();
 					if (e.getSourceNode() == r) {
 						nn = e.getTargetNode();
 					} else {
@@ -418,6 +423,8 @@ public class BlobVis extends JPanel {
 		if (filename == null)
 			filename = "hest";
 		readProgramAndDataAsGraph(filename);
+		ended=false;
+
 		// now create the main layout routine
 
 		// ActionList init = setupInit();
@@ -469,13 +476,13 @@ public class BlobVis extends JPanel {
 		display.addControlListener(new WheelZoomControl());
 		display.addControlListener(new ZoomToFitControl());
 		// create a panel for editing force values
-		ForceSimulator fsim = ((ForceDirectedLayout) force.get(1))
-				.getForceSimulator();
-		JForcePanel fpanel = new JForcePanel(fsim);
+		/*ForceSimulator fsim = ((ForceDirectedLayout) force.get(1))
+		.getForceSimulator();
+		JForcePanel fpanel = new JForcePanel(fsim);*/
 
 		JSplitPane split = new JSplitPane();
 		split.setLeftComponent(display);
-		split.setRightComponent(fpanel);
+		//split.setRightComponent(fpanel);
 		split.setOneTouchExpandable(true);
 		split.setContinuousLayout(false);
 		split.setDividerLocation(-1);
@@ -495,9 +502,10 @@ public class BlobVis extends JPanel {
 
 		display.registerKeyboardAction(new SwitchAction(), "switchit",
 				KeyStroke.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
+		display.registerKeyboardAction(new StepModelAction(), "switchit5",
+				KeyStroke.getKeyStroke("ctrl 5"), WHEN_FOCUSED);
 		/*
-		 * registerKeyboardAction(new StepModelAction(), "switchit5", KeyStroke
-		 * .getKeyStroke("ctrl 5"), WHEN_FOCUSED);
+		 * 
 		 * 
 		 * registerKeyboardAction(new PauseForceAction(), "pauseforce",
 		 * KeyStroke .getKeyStroke("P"), WHEN_FOCUSED);
@@ -539,7 +547,7 @@ public class BlobVis extends JPanel {
 		if (tree) {
 			lay = new NodeLinkTreeLayout(GRAPH);
 			((NodeLinkTreeLayout) lay)
-					.setOrientation(Constants.ORIENT_TOP_BOTTOM);
+			.setOrientation(Constants.ORIENT_TOP_BOTTOM);
 		} else {
 			lay = new ForceDirectedLayout(GRAPH);
 		}
@@ -758,7 +766,6 @@ public class BlobVis extends JPanel {
 			nodel.put(cur, n);
 
 			if (m.APB().equals(cur)) {
-				System.out.println("Found apb");
 				n.set(BlobFuse.BLOBTYPE, 1);
 			} else if (m.ADB().equals(cur)) {
 				n.set(BlobFuse.BLOBTYPE, 2);
