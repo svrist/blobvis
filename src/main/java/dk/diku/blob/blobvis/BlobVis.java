@@ -418,9 +418,11 @@ public class BlobVis extends JPanel {
 					sb.append(",");
 				}
 				Blob rb = (Blob) r.get(BlobFuse.BLOBFIELD);
+				String noc = next != null?next.opCode():"nextnullish";
+				String roc = rb != null?rb.opCode():"rbnullish";
 				throw new RuntimeException("Failed to find " + next + "("
-						+ next.opCode() + ") as a child from " + r + "(" + rb
-						+ "," + rb.opCode() + ")\nChildCount:"
+						+ noc + ") as a child from " + r + "(" + rb
+						+ "," + roc + ")\nChildCount:"
 						+ r.getChildCount() + ": " + sb.toString());
 			}
 			return nn;
