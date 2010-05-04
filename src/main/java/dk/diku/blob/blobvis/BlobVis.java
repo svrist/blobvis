@@ -1,6 +1,9 @@
 package dk.diku.blob.blobvis;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
@@ -11,10 +14,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 import model.Blob;
 import model.BondSite;
@@ -25,6 +34,7 @@ import prefuse.Visualization;
 import prefuse.action.Action;
 import prefuse.action.ActionList;
 import prefuse.action.RepaintAction;
+import prefuse.action.animate.VisibilityAnimator;
 import prefuse.action.assignment.ColorAction;
 import prefuse.action.assignment.DataColorAction;
 import prefuse.action.assignment.FontAction;
@@ -45,6 +55,7 @@ import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.FontLib;
+import prefuse.util.ui.JValueSlider;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
@@ -55,7 +66,6 @@ import prefuse.visual.sort.TreeDepthItemSorter;
 public class BlobVis extends JPanel {
 	private boolean ended = true;
 
-
 	boolean paused = false;
 
 	public class PauseForceAction implements ActionListener {
@@ -65,13 +75,24 @@ public class BlobVis extends JPanel {
 
 			m_vis.cancel("force");
 			m_vis.cancel("base");
+			m_vis.cancel("pausedactions");
+			m_vis.cancel("singleforce");
 			if (paused) {
 				System.out.println("Restarting after pause");
 				m_vis.run("force");
 				paused = false;
+				if (e.getSource() instanceof JButton) {
+					JButton pause = (JButton) e.getSource();
+					pause.setText("Pause force simulation");
+				}
 			} else {
 				System.out.println("Pausing");
 				paused = true;
+				m_vis.run("pausedactions");
+				if (e.getSource() instanceof JButton) {
+					JButton pause = (JButton) e.getSource();
+					pause.setText("Restart force simulation");
+				}
 			}
 			m_vis.run("base");
 
@@ -97,26 +118,27 @@ public class BlobVis extends JPanel {
 
 	public class SwitchAction implements ActionListener {
 
-
-
 		@Override
 		public void actionPerformed(ActionEvent e) {
-
+			if (paused) {
+				m_vis.cancel("singleforce");
+				m_vis.run("singleforce");
+			}
 			synchronized (m_vis) {
-				if (ended){
+				if (ended) {
 					System.out.println("At EXT. Done");
 					return;
 				}
-
 
 				Node r = g.getSpanningTree().getRoot();
 				Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
 				Blob adb = apb.follow(BondSite.North);
 				BondSite apbBsNext = BondSite.South;
 
-				/*System.out.println("Adb: " + adb + " b:" + apbBsNext + " apb:"
-						+ apb + " m(" + m.APB() + "," + m.ADB() + ")");*/
-
+				/*
+				 * System.out.println("Adb: " + adb + " b:" + apbBsNext +
+				 * " apb:" + apb + " m(" + m.APB() + "," + m.ADB() + ")");
+				 */
 
 				Node adbn = findNode(r, adb);
 				Node adbnnext = findNode(r, adb);
@@ -126,12 +148,14 @@ public class BlobVis extends JPanel {
 					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
 					if (m.ADB().follow(b) != null) {
 						apbBsNext = BondSite.South;
-						/*System.out.println("Going south");*/
+						/* System.out.println("Going south"); */
 					} else {
-						/*System.out.println("Nothing on " + m.ADB() + "." + b
-								+ " going west(" + m.ADB().follow(BondSite.East)
-								+ m.ADB().follow(BondSite.South)
-								+ m.ADB().follow(BondSite.West) + ") - " + adb);*/
+						/*
+						 * System.out.println("Nothing on " + m.ADB() + "." + b
+						 * + " going west(" + m.ADB().follow(BondSite.East) +
+						 * m.ADB().follow(BondSite.South) +
+						 * m.ADB().follow(BondSite.West) + ") - " + adb);
+						 */
 						apbBsNext = BondSite.West;
 					}
 				} else if (apb.opCode().startsWith("CHD")) {
@@ -141,7 +165,7 @@ public class BlobVis extends JPanel {
 					adbnnext = findNode(adbn, adb);
 				} else if (apb.opCode().startsWith("SBS")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 					Blob bb1 = adb.follow(b1);
 					Blob bb2 = adb.follow(b2);
@@ -154,7 +178,7 @@ public class BlobVis extends JPanel {
 
 				} else if (apb.opCode().startsWith("JN")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob dest1 = adb.follow(b1);
@@ -177,7 +201,7 @@ public class BlobVis extends JPanel {
 					}
 				} else if (apb.opCode().startsWith("SWL")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob adb_b1 = m.ADB().follow(b1);
@@ -201,29 +225,34 @@ public class BlobVis extends JPanel {
 							if (adb_b1 != null) {
 								// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
 								linkNodes(adb_b2n, b1, adb_b1n, ts2);
-								// case 4: something(x) on b1 and something(y) on
+								// case 4: something(x) on b1 and something(y)
+								// on
 								// b2.b1 -> b1=y, b2.b1=x
 							} else {
 
-								// Case 2: Nothing on b1 and something(x) on b2.b1
+								// Case 2: Nothing on b1 and something(x) on
+								// b2.b1
 								// -> b2.b1=null,b1=x
 								// TODO: adb_b2.unlink( b1 );
 								removeEdge(adb_b2n, adb_b2_b1n);
 							}
 						} else if (adb_b1 != null) {
-							// case 3: Something(x) on b1 and nothing on b2.b1 ->
+							// case 3: Something(x) on b1 and nothing on b2.b1
+							// ->
 							// b2.b1=x,b1=nothing
 							// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
 							linkNodes(adb_b2n, b1, adb_b1n, ts2);
 							// TODO: ADB.unlink( b1 );
 							removeEdge(adbn, adb_b1n);
 						} else {
-							/*System.out.println("Case 6");*/
-							// case 6: Nothing on b1 and nothing on b2.b1 -> nothing
+							/* System.out.println("Case 6"); */
+							// case 6: Nothing on b1 and nothing on b2.b1 ->
+							// nothing
 							// happens
 						}
 					} else if (adb_b1 != null) {
-						// case 5: something(x) on b1 and nothing on b2 -> b1=null,
+						// case 5: something(x) on b1 and nothing on b2 ->
+						// b1=null,
 						// x disappers
 						// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
 						removeEdge(adbn, adb_b1n);
@@ -240,8 +269,8 @@ public class BlobVis extends JPanel {
 				updateTheBug(r, nn, adbn, adbnnext);
 				stepModel(r, nn);
 
-				if (next.opCode().equals("EXT")){
-					ended =true;
+				if (next.opCode().equals("EXT")) {
+					ended = true;
 					try {
 						Thread.sleep(100);
 					} catch (InterruptedException e1) {
@@ -249,17 +278,17 @@ public class BlobVis extends JPanel {
 					}
 					m_vis.cancel("force");
 				}
-			};
 
+			}
 		}
 
 		private void linkNodes(Node n1, BondSite b1, Node n2, BondSite b2) {
 			// loop over adb/dest edges.
 			// Remove all with src/tar of b1/ds
 			// link adb with dest. Set src=b1, tar=ds
-			//System.out.println("Adb: " + n1);
+			// System.out.println("Adb: " + n1);
 			List<Edge> rems = gatherRemoveList(b1, n1);
-			//System.out.println("dstn: " + n2);
+			// System.out.println("dstn: " + n2);
 			rems.addAll(gatherRemoveList(b2, n2));
 			for (Edge element : rems) {
 				Edge edge = element;
@@ -268,7 +297,7 @@ public class BlobVis extends JPanel {
 			Edge ne = g.addEdge(n1, n2);
 			ne.set(BlobFuse.EDGENUMBERSRC, b1.ordinal());
 			ne.set(BlobFuse.EDGENUMBERTAR, b2.ordinal());
-			//System.out.println("Added ne: " + ne);
+			// System.out.println("Added ne: " + ne);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -283,8 +312,10 @@ public class BlobVis extends JPanel {
 						: BlobFuse.EDGENUMBERTAR;
 				int bsi = (Integer) ce.get(field);
 				int tar = (Integer) ce.get(field2);
-				/*System.out.println("edge: " + bsi + "->" + tar + " == "
-					+ needle + "." + needle.ordinal());*/
+				/*
+				 * System.out.println("edge: " + bsi + "->" + tar + " == " +
+				 * needle + "." + needle.ordinal());
+				 */
 				if (bsi == needle.ordinal()) {
 					rems.add(ce);
 				}
@@ -310,24 +341,28 @@ public class BlobVis extends JPanel {
 			removeEdge(r, adbncur);
 			adbncur.set(BlobFuse.BLOBTYPE, 4);
 			adbnnext.set(BlobFuse.BLOBTYPE, 2);
-			/*System.out.println(nn + " -> " + adbnnext);*/
+			/* System.out.println(nn + " -> " + adbnnext); */
 
 			thebug.set(BlobFuse.EDGENUMBERSRC, 0);
 			thebug.set(BlobFuse.EDGENUMBERTAR, 0);
 		}
 
 		private void removeEdge(Node n1, Node n2) {
-			//System.out.println("n1: " + n1 + " n2:" + n2);
+			// System.out.println("n1: " + n1 + " n2:" + n2);
 			Edge e1 = g.getEdge(n1, n2);
 			Edge e2 = g.getEdge(n2, n1);
 			if (e1 != null) {
-				/*System.out.println("Removing " + e1 + " " + e1.getSourceNode()
-						+ "->" + e1.getTargetNode());*/
+				/*
+				 * System.out.println("Removing " + e1 + " " +
+				 * e1.getSourceNode() + "->" + e1.getTargetNode());
+				 */
 				g.removeEdge(e1);
 			}
 			if (e2 != null) {
-				/*System.out.println("Removing " + e2 + " " + e2.getSourceNode()
-						+ "->" + e2.getTargetNode());*/
+				/*
+				 * System.out.println("Removing " + e2 + " " +
+				 * e2.getSourceNode() + "->" + e2.getTargetNode());
+				 */
 				g.removeEdge(e2);
 			}
 		}
@@ -340,8 +375,10 @@ public class BlobVis extends JPanel {
 				// vg.getSpanningTree((Node)vnn);
 				g.getSpanningTree(nn);
 				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
-				/*System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS)
-					.getTupleCount());*/
+				/*
+				 * System.out.println(m_vis.getGroup(Visualization.FOCUS_ITEMS)
+				 * .getTupleCount());
+				 */
 
 				m.step();
 			} else {
@@ -398,7 +435,7 @@ public class BlobVis extends JPanel {
 	private static final String AGGR = "aggregates";
 	Layout lay;
 	private boolean tree = false;
-	int hops = 5;
+	int hops = 10;
 	final GraphDistanceFilter filter;
 	private Visualization m_vis;
 
@@ -422,7 +459,7 @@ public class BlobVis extends JPanel {
 		if (filename == null)
 			filename = "hest";
 		readProgramAndDataAsGraph(filename);
-		ended=false;
+		ended = false;
 
 		// now create the main layout routine
 
@@ -437,15 +474,22 @@ public class BlobVis extends JPanel {
 		init.add(new RadialTreeLayout(GRAPH));
 		init.add(new RepaintAction());
 
-		ActionList singleforce = new ActionList();
-		singleforce.add(new ForceDirectedLayout(GRAPH, false, true));
+		ActionList singleforce = new ActionList(1000);
 		singleforce.add(genColors());
+		singleforce.add(new ForceDirectedLayout(GRAPH, false));
 		singleforce.add(new RepaintAction());
 		m_vis.putAction("singleforce", singleforce);
 
 		ActionList base = new ActionList(Action.INFINITY, 100);
 		base.add(filter);
 		base.add(genColors()); // base.add(new AggregateLayout(AGGR));
+		base.add(new RepaintAction());
+
+		ActionList pausedActions = new ActionList(500);
+		pausedActions.add(new VisibilityAnimator());
+
+		m_vis.putAction("pausedactions", pausedActions);
+		m_vis.alwaysRunAfter("pausedactions", "base");
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(genColors());
@@ -469,19 +513,68 @@ public class BlobVis extends JPanel {
 		display.setItemSorter(new TreeDepthItemSorter());
 
 		display.addControlListener(new BlobDragControl());
-		//		display.addControlListener(new FocusControl(1));
+		// display.addControlListener(new FocusControl(1));
 		display.addControlListener(new PanControl());
 		display.addControlListener(new ZoomControl());
 		display.addControlListener(new WheelZoomControl());
 		display.addControlListener(new ZoomToFitControl());
-		// create a panel for editing force values
-		/*ForceSimulator fsim = ((ForceDirectedLayout) force.get(1))
-		.getForceSimulator();
-		JForcePanel fpanel = new JForcePanel(fsim);*/
+
+		JPanel panel = new JPanel();
+		
+
+		Box buttons = new Box(BoxLayout.Y_AXIS);
+		final JButton step = new JButton("Step model");
+		step.addActionListener(new SwitchAction());
+		step.setEnabled(true);
+		buttons.setBorder(BorderFactory
+				.createTitledBorder("Blob Model"));
+		buttons.add(step);
+		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
+                Short.MAX_VALUE));
+		
+
+		Box forcebuttons = new Box(BoxLayout.Y_AXIS);
+		final JButton pause = new JButton("Pause force movements");
+		pause.addActionListener(new PauseForceAction());
+		pause.setEnabled(true);
+		forcebuttons.add(pause);
+		forcebuttons.setBorder(BorderFactory
+				.createTitledBorder("Force simulation ctrl"));
+		forcebuttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
+                Short.MAX_VALUE));
+
+		
+		
+		final JValueSlider slider = new JValueSlider("Distance", 0, 35, hops);
+        slider.addChangeListener(new ChangeListener() {
+            public void stateChanged(ChangeEvent e) {
+                filter.setDistance(slider.getValue().intValue());
+                m_vis.run("base");
+            }
+        });
+        
+        /*slider.setPreferredSize(new Dimension(300,30));
+        slider.setMaximumSize(new Dimension(300,30));*/
+        
+        Box cf = new Box(BoxLayout.Y_AXIS);
+        cf.setAlignmentX(Component.LEFT_ALIGNMENT);
+        cf.add(slider);
+        cf.setBorder(BorderFactory.createTitledBorder("Connectivity Filter"));
+        
+        Box boxpanel = new Box(BoxLayout.Y_AXIS);
+		boxpanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		boxpanel.add(buttons);
+		boxpanel.add(Box.createVerticalStrut(20));
+		boxpanel.add(forcebuttons);
+		boxpanel.add(Box.createVerticalStrut(20));
+		boxpanel.add(cf);
+		
+		panel.add(boxpanel);
+		//panel.add(Box.createVerticalGlue());
 
 		JSplitPane split = new JSplitPane();
 		split.setLeftComponent(display);
-		//split.setRightComponent(fpanel);
+		split.setRightComponent(panel);
 		split.setOneTouchExpandable(true);
 		split.setContinuousLayout(false);
 		split.setDividerLocation(-1);
@@ -497,10 +590,11 @@ public class BlobVis extends JPanel {
 
 		if (!paused) {
 			m_vis.run("force");
+			m_vis.cancel("pausedactions");
 		}
 
-		display.registerKeyboardAction(new SwitchAction(), "switchit",
-				KeyStroke.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
+		registerKeyboardAction(new SwitchAction(), "switchit", KeyStroke
+				.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
 		display.registerKeyboardAction(new StepModelAction(), "switchit5",
 				KeyStroke.getKeyStroke("ctrl 5"), WHEN_FOCUSED);
 		/*
@@ -546,7 +640,7 @@ public class BlobVis extends JPanel {
 		if (tree) {
 			lay = new NodeLinkTreeLayout(GRAPH);
 			((NodeLinkTreeLayout) lay)
-			.setOrientation(Constants.ORIENT_TOP_BOTTOM);
+					.setOrientation(Constants.ORIENT_TOP_BOTTOM);
 		} else {
 			lay = new ForceDirectedLayout(GRAPH);
 		}
