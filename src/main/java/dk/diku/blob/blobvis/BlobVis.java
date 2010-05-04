@@ -33,7 +33,6 @@ import prefuse.action.layout.Layout;
 import prefuse.action.layout.graph.ForceDirectedLayout;
 import prefuse.action.layout.graph.NodeLinkTreeLayout;
 import prefuse.action.layout.graph.RadialTreeLayout;
-import prefuse.controls.FocusControl;
 import prefuse.controls.PanControl;
 import prefuse.controls.WheelZoomControl;
 import prefuse.controls.ZoomControl;
@@ -470,7 +469,7 @@ public class BlobVis extends JPanel {
 		display.setItemSorter(new TreeDepthItemSorter());
 
 		display.addControlListener(new BlobDragControl());
-		display.addControlListener(new FocusControl(1));
+		//		display.addControlListener(new FocusControl(1));
 		display.addControlListener(new PanControl());
 		display.addControlListener(new ZoomControl());
 		display.addControlListener(new WheelZoomControl());
