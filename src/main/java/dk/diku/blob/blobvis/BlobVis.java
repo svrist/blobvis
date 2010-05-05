@@ -5,13 +5,19 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
+import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.text.FieldPosition;
+import java.text.Format;
+import java.text.NumberFormat;
+import java.text.ParsePosition;
 import java.util.ArrayList;
+import java.util.Formatter;
 import java.util.Iterator;
 import java.util.List;
 
@@ -22,6 +28,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
+import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -31,6 +38,9 @@ import javax.swing.JPopupMenu;
 import javax.swing.JSplitPane;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.text.NumberFormatter;
+
+import net.miginfocom.swing.MigLayout;
 
 import model.Blob;
 import model.BondSite;
@@ -61,6 +71,7 @@ import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.FontLib;
 import prefuse.util.ui.JValueSlider;
+import prefuse.util.ui.UILib;
 import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
@@ -76,7 +87,7 @@ public class BlobVis extends JPanel {
 	private final class PopupListener extends ControlAdapter {
 		@Override
 		public void itemReleased(final VisualItem item, MouseEvent e) {
-			if (e.isPopupTrigger() ) {
+			if (e.isPopupTrigger()) {
 				item.setFixed(true);
 				tmpStopForce();
 				Control al = (Control) item.get(BFConstants.ACTION);
@@ -87,6 +98,7 @@ public class BlobVis extends JPanel {
 						public void focusLost(FocusEvent e) {
 							tmpStartForce();
 						}
+
 						@Override
 						public void focusGained(FocusEvent e) {
 							tmpStopForce();
@@ -114,117 +126,117 @@ public class BlobVis extends JPanel {
 		}
 
 	}
+
 	private static class AddBlobData {
 		public BondSite fromBs;
 		public BondSite toBs;
 		public int cargo;
 		public boolean ok = true;
+
 		@Override
 		public String toString() {
 			return "AddBlobData [cargo=" + cargo + ", fromBs=" + fromBs
-			+ ", ok=" + ok + ", toBs=" + toBs + "]";
+					+ ", ok=" + ok + ", toBs=" + toBs + "]";
 		}
-
 
 	}
 
 	private static class BsListItem {
-		public BsListItem(BondSite bs){
+		public BsListItem(BondSite bs) {
 			this.bs = bs;
 		}
+
 		public BondSite bs;
+
 		@Override
-		public String toString(){
-			return bs.ordinal()+" : "+bs.toString();
+		public String toString() {
+			return bs.ordinal() + " : " + bs.toString();
 		}
 	}
 
-	protected AddBlobData getAddBlobData(Blob b){
+	protected AddBlobData getAddBlobData(Blob b) {
 		Component c = this;
 		final AddBlobData abd = new AddBlobData();
+		abd.ok = false;
 		final List<BsListItem> possibleFrom = new ArrayList<BsListItem>();
 		final List<BsListItem> possibleTo = new ArrayList<BsListItem>();
 
 		// -- build the dialog -----
 		// we need to get the enclosing frame first
-		while ( c != null && !(c instanceof JFrame) ) {
+		while (c != null && !(c instanceof JFrame)) {
 			c = c.getParent();
 		}
-		final JDialog dialog = new JDialog(
-				(JFrame)c, "Add new Blob", true);
+		final JDialog dialog = new JDialog((JFrame) c, "Add new Blob", true);
 
 		// create the ok/cancel buttons
 		final JButton ok = new JButton("OK");
-		ok.setEnabled(false);
-		ok.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				dialog.setVisible(false);
-			}
-		});
+
 		JButton cancel = new JButton("Cancel");
 		cancel.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				abd.ok = false;
 				dialog.setVisible(false);
+				System.out.println("Adbok " + abd.ok);
 			}
 		});
 
 		// build the selection list
-		int selindx = -1;
-		for (int i = 0; i < 4; i++){
+		int selindx = 0; // Default north
+		int foundc = 0;
+		for (int i = 0; i < 4; i++) {
 			BsListItem bsi = new BsListItem(BondSite.create(i));
-			if (b.follow(bsi.bs)==null){
+			if (b.follow(bsi.bs) == null) {
 				possibleFrom.add(bsi);
-				selindx++;
+				if (i > 0 && selindx == 0) {
+					selindx = foundc;
+				}
+				foundc++;
 			}
 		}
-		if (possibleFrom.size() ==0){
-			JOptionPane.showMessageDialog(c,"This data blob has no free BondSites","Error",JOptionPane.ERROR_MESSAGE);
+		if (possibleFrom.size() == 0) {
+			JOptionPane.showMessageDialog(c,
+					"This data blob has no free BondSites", "Error",
+					JOptionPane.ERROR_MESSAGE);
 			abd.ok = false;
 			return abd;
 		}
-		for (int i = 0; i < 4; i++){
+		for (int i = 0; i < 4; i++) {
 			BsListItem bsi = new BsListItem(BondSite.create(i));
 			possibleTo.add(bsi);
 		}
 
 		final JComboBox fromlist = new JComboBox(possibleFrom.toArray());
 		fromlist.setSelectedIndex(selindx);
-		abd.fromBs = ((BsListItem)fromlist.getSelectedItem()).bs;
+		abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).bs;
 		final JComboBox tolist = new JComboBox(possibleTo.toArray());
 		tolist.setSelectedIndex(1);
-		abd.toBs = ((BsListItem)tolist.getSelectedItem()).bs;
-		fromlist.addActionListener(
-				new ActionListener() {
-					public void actionPerformed(ActionEvent e){
-						int sel = fromlist.getSelectedIndex();
-						if ( sel >= 0 ) {
-							ok.setEnabled(true);
-							abd.fromBs = ((BsListItem)fromlist.getSelectedItem()).bs;
-						} else {
-							ok.setEnabled(false);
-							abd.fromBs =null;
-						}
-					}
-				});
-		tolist.addActionListener(
-				new ActionListener() {
-					public void actionPerformed(ActionEvent e){
-						int sel = tolist.getSelectedIndex();
-						if ( sel >= 0 ) {
-							ok.setEnabled(true);
-							BsListItem bsi =  (BsListItem) tolist.getSelectedItem();
-							//System.out.println(bsi+" : "+abd);
-							abd.toBs = bsi.bs;
-						} else {
-							ok.setEnabled(false);
-							abd.toBs =null;
-						}
-					}
-				});
-
-
-		JLabel title = new JLabel("From BondSite:");
+		abd.toBs = ((BsListItem) tolist.getSelectedItem()).bs;
+		fromlist.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				int sel = fromlist.getSelectedIndex();
+				if (sel >= 0) {
+					ok.setEnabled(true);
+					abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).bs;
+				} else {
+					ok.setEnabled(false);
+					abd.fromBs = null;
+				}
+			}
+		});
+		tolist.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				int sel = tolist.getSelectedIndex();
+				if (sel >= 0) {
+					ok.setEnabled(true);
+					BsListItem bsi = (BsListItem) tolist.getSelectedItem();
+					// System.out.println(bsi+" : "+abd);
+					abd.toBs = bsi.bs;
+				} else {
+					ok.setEnabled(false);
+					abd.toBs = null;
+				}
+			}
+		});
 
 		// layout the buttons
 		Box bbox = new Box(BoxLayout.X_AXIS);
@@ -235,16 +247,41 @@ public class BlobVis extends JPanel {
 		bbox.add(cancel);
 		bbox.add(Box.createHorizontalStrut(5));
 
+		NumberFormatter numformat = new NumberFormatter(NumberFormat
+				.getIntegerInstance());
+		numformat.setMinimum(0);
+		numformat.setMaximum(127);
+		final JFormattedTextField cargoinput = new JFormattedTextField(
+				numformat);
+		cargoinput.setValue(127);
+
+		ok.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				abd.ok = true;
+				dialog.setVisible(false);
+				abd.cargo = (Integer) cargoinput.getValue();
+			}
+		});
+
 		Box bbox2 = new Box(BoxLayout.X_AXIS);
+		bbox2.setBorder(BorderFactory.createTitledBorder("Blob Model"));
 		bbox2.add(fromlist);
 		bbox2.add(tolist);
+		bbox2.add(cargoinput);
 
 		// put everything into a panel
-		JPanel panel = new JPanel(new BorderLayout());
-		panel.add(title, BorderLayout.NORTH);
-		panel.add(bbox2, BorderLayout.CENTER);
-		panel.add(bbox, BorderLayout.SOUTH);
-		panel.setBorder(BorderFactory.createEmptyBorder(5,2,2,2));
+		JPanel panel = new JPanel(new MigLayout());
+		panel.add(new JLabel("From Bondsite:"));
+
+		panel.add(new JLabel("To Bondsite:"), "skip 1");
+		panel.add(new JLabel("Cargo:"), "wrap");
+
+		panel.add(fromlist);
+		panel.add(new JLabel("->"));
+		panel.add(tolist);
+		panel.add(cargoinput, "wrap");
+		panel.add(bbox, "span, gapleft push,wrap");
+		panel.setBorder(BorderFactory.createTitledBorder("Blob data"));
 
 		// show the dialog
 		dialog.setContentPane(panel);
@@ -258,9 +295,8 @@ public class BlobVis extends JPanel {
 
 	protected void addVisualBlob(VisualItem item) {
 		AddBlobData abd = getAddBlobData(bgf.getBlob(item));
-		if (abd.ok){
-			System.out.println(abd);
-			bgf.addDataBlobToBondSite(item, abd.fromBs,abd.toBs,abd.cargo);
+		if (abd.ok) {
+			bgf.addDataBlobToBondSite(item, abd.fromBs, abd.toBs, abd.cargo);
 		}
 	}
 
@@ -276,7 +312,6 @@ public class BlobVis extends JPanel {
 			anItem.addActionListener(new AbstractAction() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
-
 					addVisualBlob(vi);
 				}
 			});
@@ -290,6 +325,27 @@ public class BlobVis extends JPanel {
 
 			});
 			add(anItem);
+			anItem = new JMenuItem("Delete this blob");
+			anItem.addActionListener(new AbstractAction() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					confirmDeleteBlob(vi);
+				}
+
+			});
+			add(anItem);
+		}
+
+	}
+
+	private void confirmDeleteBlob(VisualItem vi) {
+
+		int result = JOptionPane.showConfirmDialog(this,
+				"Are you sure you want to delete this Blob?",
+				"Confirm blob deletion", JOptionPane.YES_NO_OPTION,
+				JOptionPane.QUESTION_MESSAGE);
+		if (result==JOptionPane.YES_OPTION){
+			bgf.removeBlob(vi);
 		}
 
 	}
@@ -340,7 +396,7 @@ public class BlobVis extends JPanel {
 				Node adbn = findNode(r, adb);
 				Node adbnnext = findNode(r, adb);
 
-				r.set(BFConstants.BLOBTYPE, 3);
+				r.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_INPGR);
 				if (apb.opCode().startsWith("JB")) {
 					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
 					if (m.ADB().follow(b) != null) {
@@ -362,7 +418,7 @@ public class BlobVis extends JPanel {
 					adbnnext = findNode(adbn, adb);
 				} else if (apb.opCode().startsWith("SBS")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 					Blob bb1 = adb.follow(b1);
 					Blob bb2 = adb.follow(b2);
@@ -375,7 +431,7 @@ public class BlobVis extends JPanel {
 
 				} else if (apb.opCode().startsWith("JN")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob dest1 = adb.follow(b1);
@@ -398,7 +454,7 @@ public class BlobVis extends JPanel {
 					}
 				} else if (apb.opCode().startsWith("SWL")) {
 					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
+							.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob adb_b1 = m.ADB().follow(b1);
@@ -538,8 +594,8 @@ public class BlobVis extends JPanel {
 
 			Edge thebug = g.addEdge(nn, adbnnext);
 			removeEdge(r, adbncur);
-			adbncur.set(BFConstants.BLOBTYPE, 4);
-			adbnnext.set(BFConstants.BLOBTYPE, 2);
+			adbncur.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
+			adbnnext.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_ADB);
 			/* System.out.println(nn + " -> " + adbnnext); */
 
 			thebug.set(BFConstants.EDGENUMBERSRC, 0);
@@ -570,7 +626,7 @@ public class BlobVis extends JPanel {
 
 			if (nn != null) {
 				VisualItem vnn = (VisualItem) vg.getNode(nn.getRow());
-				nn.set(BFConstants.BLOBTYPE, 1);
+				nn.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
 				// vg.getSpanningTree((Node)vnn);
 				g.getSpanningTree(nn);
 				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
@@ -656,7 +712,6 @@ public class BlobVis extends JPanel {
 				new BlobEdgeRenderer());
 		// dfr.add("ingroup('aggregates')", polyR);
 		m_vis.setRendererFactory(dfr);
-
 
 		if (filename == null)
 			filename = "hest";
@@ -840,7 +895,6 @@ public class BlobVis extends JPanel {
 		}
 	}
 
-
 	private ActionList col_cache = null;
 
 	private ActionList genColors() {
@@ -881,14 +935,14 @@ public class BlobVis extends JPanel {
 				colors.add(aFill);
 			}
 
-			int[] palette = new int[] { ColorLib.rgba(255, 100, 100, 200), // apb
-					ColorLib.rgba(100, 255, 100, 200), // adb
-					ColorLib.rgba(255, 200, 200, 170), // inpgr
-					ColorLib.rgba(200, 255, 200, 170), // data
+			int[] palette = new int[] { ColorLib.rgba(255, 200, 200, 210), // adb 0
+					ColorLib.rgba(100, 255, 000, 210), // apb 1
+					ColorLib.rgba(255, 110, 110, 210), // data 2
+					ColorLib.rgba(200, 255, 200, 210), // inpgr 3
 			};
 			ColorAction nFillAdb = new DataColorAction(NODES,
-					BFConstants.BLOBTYPE, Constants.NOMINAL, VisualItem.FILLCOLOR,
-					palette);
+					BFConstants.BLOBTYPE, Constants.NOMINAL,
+					VisualItem.FILLCOLOR, palette);
 
 			// bundle the color actions
 
@@ -1042,13 +1096,11 @@ public class BlobVis extends JPanel {
 			m.addBlob(db3);
 			m.addBlob(db4);
 
-			bgf = new BlobGraphFuser(g,m,clickHandler);
+			bgf = new BlobGraphFuser(g, m, clickHandler);
 			bgf.populateGraphFromModelAPB();
 		}
 		return type;
 	}
-
-
 
 	private ControlAdapter clickHandler = new ControlAdapter() {
 		@Override
@@ -1057,8 +1109,6 @@ public class BlobVis extends JPanel {
 			menu.show(m_vis.getDisplay(0), e.getX(), e.getY());
 		}
 	};
-
-
 
 	public static void main(String[] argv) {
 		String filename = null;
@@ -1074,6 +1124,7 @@ public class BlobVis extends JPanel {
 	}
 
 	public static JFrame demo(String filename) {
+		UILib.setPlatformLookAndFeel();
 		BlobVis ad = new BlobVis(filename);
 		JFrame frame = new JFrame("dikuBlob - B l o b V i s");
 		frame.setExtendedState(Frame.MAXIMIZED_HORIZ);

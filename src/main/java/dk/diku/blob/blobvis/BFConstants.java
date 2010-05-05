@@ -18,6 +18,11 @@ public class BFConstants {
 	public static final String LABEL = "label";
 	/** Node table schema used for generated Graphs */
 	public static final Schema LABEL_SCHEMA = new Schema();
+	
+	public static final int BLOB_TYPE_DATA = 0;
+	public static final int BLOB_TYPE_APB = 1;
+	public static final int BLOB_TYPE_ADB = 2;
+	public static final int BLOB_TYPE_INPGR = 3;
 
 
 	static {

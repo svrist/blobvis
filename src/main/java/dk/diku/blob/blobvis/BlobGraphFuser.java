@@ -110,9 +110,10 @@ public class BlobGraphFuser {
 		ret.set(BFConstants.BLOBFIELD, b);
 
 		if (inPgr) {
-			ret.set(BFConstants.BLOBTYPE, 3);
+			ret.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_INPGR);
 			ret.setString(BFConstants.LABEL, "" + b.opCode());
 		} else {
+			ret.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
 			ret.setString(BFConstants.LABEL, "" + b.getCargo());
 		}
 		ret.set(BFConstants.BLOBINPGR, inPgr);
@@ -121,11 +122,11 @@ public class BlobGraphFuser {
 	}
 
 	public static void setNodeAdb(Node n) {
-		n.set(BFConstants.BLOBTYPE, 2);
+		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_ADB);
 	}
 
 	public static void setNodeApb(Node n) {
-		n.set(BFConstants.BLOBTYPE, 1);
+		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
 	}
 
 	public void populateGraphFromModelAPB() {
@@ -147,6 +148,18 @@ public class BlobGraphFuser {
 
 	public Blob getBlob(Tuple item) {
 		return ntob.get(item.getRow());
+	}
+
+	public void removeBlob(VisualItem vi) {
+		Blob b = ntob.get(vi.getRow());
+		for (int i =0; i < 4; i++){
+			BondSite bs = BondSite.create(i);
+			Blob otherend = b.follow(bs);
+			if (otherend!=null){
+				Blob.unlink(b, otherend, bs, otherend.boundTo(b));
+			}
+		}
+		g.removeNode(vi.getRow());
 	}
 
 
