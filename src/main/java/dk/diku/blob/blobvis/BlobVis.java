@@ -1,27 +1,34 @@
 package dk.diku.blob.blobvis;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JSplitPane;
-import javax.swing.KeyStroke;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -41,16 +48,14 @@ import prefuse.action.assignment.FontAction;
 import prefuse.action.filter.GraphDistanceFilter;
 import prefuse.action.layout.Layout;
 import prefuse.action.layout.graph.ForceDirectedLayout;
-import prefuse.action.layout.graph.NodeLinkTreeLayout;
 import prefuse.action.layout.graph.RadialTreeLayout;
+import prefuse.controls.Control;
+import prefuse.controls.ControlAdapter;
 import prefuse.controls.PanControl;
 import prefuse.controls.WheelZoomControl;
-import prefuse.controls.ZoomControl;
-import prefuse.controls.ZoomToFitControl;
 import prefuse.data.Edge;
 import prefuse.data.Graph;
 import prefuse.data.Node;
-import prefuse.data.Schema;
 import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
@@ -68,52 +73,244 @@ public class BlobVis extends JPanel {
 
 	boolean paused = false;
 
+	private final class PopupListener extends ControlAdapter {
+		@Override
+		public void itemReleased(final VisualItem item, MouseEvent e) {
+			if (e.isPopupTrigger() ) {
+				item.setFixed(true);
+				tmpStopForce();
+				Control al = (Control) item.get(BFConstants.ACTION);
+				if (al != null) {
+					PopUpDemo menu = new PopUpDemo(item);
+					menu.addFocusListener(new FocusListener() {
+						@Override
+						public void focusLost(FocusEvent e) {
+							tmpStartForce();
+						}
+						@Override
+						public void focusGained(FocusEvent e) {
+							tmpStopForce();
+						}
+					});
+					menu.show(e.getComponent(), e.getX(), e.getY());
+					menu.requestFocus();
+				}
+			}
+		}
+	}
+
 	public class PauseForceAction implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
 
-			m_vis.cancel("force");
 			m_vis.cancel("base");
 			m_vis.cancel("pausedactions");
 			m_vis.cancel("singleforce");
-			if (paused) {
-				System.out.println("Restarting after pause");
-				m_vis.run("force");
-				paused = false;
-				if (e.getSource() instanceof JButton) {
-					JButton pause = (JButton) e.getSource();
-					pause.setText("Pause force simulation");
-				}
-			} else {
-				System.out.println("Pausing");
-				paused = true;
-				m_vis.run("pausedactions");
-				if (e.getSource() instanceof JButton) {
-					JButton pause = (JButton) e.getSource();
-					pause.setText("Restart force simulation");
-				}
-			}
+
+			toggleForce();
 			m_vis.run("base");
 
 		}
 
 	}
-
-	public class StepModelAction implements ActionListener {
-
+	private static class AddBlobData {
+		public BondSite fromBs;
+		public BondSite toBs;
+		public int cargo;
+		public boolean ok = true;
 		@Override
-		public void actionPerformed(ActionEvent arg0) {
-			hops += 1;
-			filter.setDistance(hops);
-
-			/*
-			 * getVisualization().cancel("force");
-			 * getVisualization().run("force");
-			 */
-
+		public String toString() {
+			return "AddBlobData [cargo=" + cargo + ", fromBs=" + fromBs
+			+ ", ok=" + ok + ", toBs=" + toBs + "]";
 		}
 
+
+	}
+
+	private static class BsListItem {
+		public BsListItem(BondSite bs){
+			this.bs = bs;
+		}
+		public BondSite bs;
+		@Override
+		public String toString(){
+			return bs.ordinal()+" : "+bs.toString();
+		}
+	}
+
+	protected AddBlobData getAddBlobData(Blob b){
+		Component c = this;
+		final AddBlobData abd = new AddBlobData();
+		final List<BsListItem> possibleFrom = new ArrayList<BsListItem>();
+		final List<BsListItem> possibleTo = new ArrayList<BsListItem>();
+
+		// -- build the dialog -----
+		// we need to get the enclosing frame first
+		while ( c != null && !(c instanceof JFrame) ) {
+			c = c.getParent();
+		}
+		final JDialog dialog = new JDialog(
+				(JFrame)c, "Add new Blob", true);
+
+		// create the ok/cancel buttons
+		final JButton ok = new JButton("OK");
+		ok.setEnabled(false);
+		ok.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				dialog.setVisible(false);
+			}
+		});
+		JButton cancel = new JButton("Cancel");
+		cancel.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				abd.ok = false;
+				dialog.setVisible(false);
+			}
+		});
+
+		// build the selection list
+		int selindx = -1;
+		for (int i = 0; i < 4; i++){
+			BsListItem bsi = new BsListItem(BondSite.create(i));
+			if (b.follow(bsi.bs)==null){
+				possibleFrom.add(bsi);
+				selindx++;
+			}
+		}
+		if (possibleFrom.size() ==0){
+			JOptionPane.showMessageDialog(c,"This data blob has no free BondSites","Error",JOptionPane.ERROR_MESSAGE);
+			abd.ok = false;
+			return abd;
+		}
+		for (int i = 0; i < 4; i++){
+			BsListItem bsi = new BsListItem(BondSite.create(i));
+			possibleTo.add(bsi);
+		}
+
+		final JComboBox fromlist = new JComboBox(possibleFrom.toArray());
+		fromlist.setSelectedIndex(selindx);
+		abd.fromBs = ((BsListItem)fromlist.getSelectedItem()).bs;
+		final JComboBox tolist = new JComboBox(possibleTo.toArray());
+		tolist.setSelectedIndex(1);
+		abd.toBs = ((BsListItem)tolist.getSelectedItem()).bs;
+		fromlist.addActionListener(
+				new ActionListener() {
+					public void actionPerformed(ActionEvent e){
+						int sel = fromlist.getSelectedIndex();
+						if ( sel >= 0 ) {
+							ok.setEnabled(true);
+							abd.fromBs = ((BsListItem)fromlist.getSelectedItem()).bs;
+						} else {
+							ok.setEnabled(false);
+							abd.fromBs =null;
+						}
+					}
+				});
+		tolist.addActionListener(
+				new ActionListener() {
+					public void actionPerformed(ActionEvent e){
+						int sel = tolist.getSelectedIndex();
+						if ( sel >= 0 ) {
+							ok.setEnabled(true);
+							BsListItem bsi =  (BsListItem) tolist.getSelectedItem();
+							//System.out.println(bsi+" : "+abd);
+							abd.toBs = bsi.bs;
+						} else {
+							ok.setEnabled(false);
+							abd.toBs =null;
+						}
+					}
+				});
+
+
+		JLabel title = new JLabel("From BondSite:");
+
+		// layout the buttons
+		Box bbox = new Box(BoxLayout.X_AXIS);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(Box.createHorizontalGlue());
+		bbox.add(ok);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(cancel);
+		bbox.add(Box.createHorizontalStrut(5));
+
+		Box bbox2 = new Box(BoxLayout.X_AXIS);
+		bbox2.add(fromlist);
+		bbox2.add(tolist);
+
+		// put everything into a panel
+		JPanel panel = new JPanel(new BorderLayout());
+		panel.add(title, BorderLayout.NORTH);
+		panel.add(bbox2, BorderLayout.CENTER);
+		panel.add(bbox, BorderLayout.SOUTH);
+		panel.setBorder(BorderFactory.createEmptyBorder(5,2,2,2));
+
+		// show the dialog
+		dialog.setContentPane(panel);
+		dialog.pack();
+		dialog.setLocationRelativeTo(c);
+		dialog.setVisible(true);
+		dialog.dispose();
+
+		return abd;
+	}
+
+	protected void addVisualBlob(VisualItem item) {
+		AddBlobData abd = getAddBlobData(bgf.getBlob(item));
+		if (abd.ok){
+			System.out.println(abd);
+			bgf.addDataBlobToBondSite(item, abd.fromBs,abd.toBs,abd.cargo);
+		}
+	}
+
+	private void showAddBlobGridDialog() {
+
+	}
+
+	class PopUpDemo extends JPopupMenu {
+		JMenuItem anItem;
+
+		public PopUpDemo(final VisualItem vi) {
+			anItem = new JMenuItem("Add Blob here...");
+			anItem.addActionListener(new AbstractAction() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+
+					addVisualBlob(vi);
+				}
+			});
+			add(anItem);
+			anItem = new JMenuItem("Add Grid here...");
+			anItem.addActionListener(new AbstractAction() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					showAddBlobGridDialog();
+				}
+
+			});
+			add(anItem);
+		}
+
+	}
+
+	class PopClickListener extends MouseAdapter {
+		@Override
+		public void mousePressed(MouseEvent e) {
+
+			if (e.isPopupTrigger())
+				doPop(e);
+		}
+
+		@Override
+		public void mouseReleased(MouseEvent e) {
+			if (e.isPopupTrigger())
+				doPop(e);
+		}
+
+		private void doPop(MouseEvent e) {
+
+		}
 	}
 
 	public class SwitchAction implements ActionListener {
@@ -131,7 +328,7 @@ public class BlobVis extends JPanel {
 				}
 
 				Node r = g.getSpanningTree().getRoot();
-				Blob apb = (Blob) r.get(BlobFuse.BLOBFIELD);
+				Blob apb = (Blob) r.get(BFConstants.BLOBFIELD);
 				Blob adb = apb.follow(BondSite.North);
 				BondSite apbBsNext = BondSite.South;
 
@@ -143,7 +340,7 @@ public class BlobVis extends JPanel {
 				Node adbn = findNode(r, adb);
 				Node adbnnext = findNode(r, adb);
 
-				r.set(BlobFuse.BLOBTYPE, 3);
+				r.set(BFConstants.BLOBTYPE, 3);
 				if (apb.opCode().startsWith("JB")) {
 					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
 					if (m.ADB().follow(b) != null) {
@@ -165,7 +362,7 @@ public class BlobVis extends JPanel {
 					adbnnext = findNode(adbn, adb);
 				} else if (apb.opCode().startsWith("SBS")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 					Blob bb1 = adb.follow(b1);
 					Blob bb2 = adb.follow(b2);
@@ -178,7 +375,7 @@ public class BlobVis extends JPanel {
 
 				} else if (apb.opCode().startsWith("JN")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob dest1 = adb.follow(b1);
@@ -201,7 +398,7 @@ public class BlobVis extends JPanel {
 					}
 				} else if (apb.opCode().startsWith("SWL")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob adb_b1 = m.ADB().follow(b1);
@@ -276,7 +473,7 @@ public class BlobVis extends JPanel {
 					} catch (InterruptedException e1) {
 						e1.printStackTrace();
 					}
-					m_vis.cancel("force");
+					stopForce();
 				}
 
 			}
@@ -295,8 +492,8 @@ public class BlobVis extends JPanel {
 				g.removeEdge(edge);
 			}
 			Edge ne = g.addEdge(n1, n2);
-			ne.set(BlobFuse.EDGENUMBERSRC, b1.ordinal());
-			ne.set(BlobFuse.EDGENUMBERTAR, b2.ordinal());
+			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
 			// System.out.println("Added ne: " + ne);
 		}
 
@@ -306,12 +503,14 @@ public class BlobVis extends JPanel {
 			Iterator removeIterator = n.edges();
 			while (removeIterator.hasNext()) {
 				Edge ce = (Edge) removeIterator.next();
-				String field = ce.getSourceNode() == n ? BlobFuse.EDGENUMBERSRC
-						: BlobFuse.EDGENUMBERTAR;
-				String field2 = ce.getSourceNode() != n ? BlobFuse.EDGENUMBERSRC
-						: BlobFuse.EDGENUMBERTAR;
+				String field = ce.getSourceNode() == n ? BFConstants.EDGENUMBERSRC
+						: BFConstants.EDGENUMBERTAR;
+				/*
+				 * String field2 = ce.getSourceNode() != n ?
+				 * BlobFuse.EDGENUMBERSRC : BlobFuse.EDGENUMBERTAR;
+				 */
 				int bsi = (Integer) ce.get(field);
-				int tar = (Integer) ce.get(field2);
+				// int tar = (Integer) ce.get(field2);
 				/*
 				 * System.out.println("edge: " + bsi + "->" + tar + " == " +
 				 * needle + "." + needle.ordinal());
@@ -327,10 +526,10 @@ public class BlobVis extends JPanel {
 			Node bbn1 = findNode(srcn, target);
 			Edge e1 = g.getEdge(srcn, bbn1);
 			if (e1 != null) {
-				e1.set(BlobFuse.EDGENUMBERSRC, newvalue.ordinal());
+				e1.set(BFConstants.EDGENUMBERSRC, newvalue.ordinal());
 			} else {
 				e1 = g.getEdge(bbn1, srcn);
-				e1.set(BlobFuse.EDGENUMBERTAR, newvalue.ordinal());
+				e1.set(BFConstants.EDGENUMBERTAR, newvalue.ordinal());
 			}
 
 		}
@@ -339,12 +538,12 @@ public class BlobVis extends JPanel {
 
 			Edge thebug = g.addEdge(nn, adbnnext);
 			removeEdge(r, adbncur);
-			adbncur.set(BlobFuse.BLOBTYPE, 4);
-			adbnnext.set(BlobFuse.BLOBTYPE, 2);
+			adbncur.set(BFConstants.BLOBTYPE, 4);
+			adbnnext.set(BFConstants.BLOBTYPE, 2);
 			/* System.out.println(nn + " -> " + adbnnext); */
 
-			thebug.set(BlobFuse.EDGENUMBERSRC, 0);
-			thebug.set(BlobFuse.EDGENUMBERTAR, 0);
+			thebug.set(BFConstants.EDGENUMBERSRC, 0);
+			thebug.set(BFConstants.EDGENUMBERTAR, 0);
 		}
 
 		private void removeEdge(Node n1, Node n2) {
@@ -371,7 +570,7 @@ public class BlobVis extends JPanel {
 
 			if (nn != null) {
 				VisualItem vnn = (VisualItem) vg.getNode(nn.getRow());
-				nn.set(BlobFuse.BLOBTYPE, 1);
+				nn.set(BFConstants.BLOBTYPE, 1);
 				// vg.getSpanningTree((Node)vnn);
 				g.getSpanningTree(nn);
 				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
@@ -398,7 +597,7 @@ public class BlobVis extends JPanel {
 				} else {
 					nn = e.getSourceNode();
 				}
-				Blob tmp = (Blob) nn.get(BlobFuse.BLOBFIELD);
+				Blob tmp = (Blob) nn.get(BFConstants.BLOBFIELD);
 				if (tmp == next)
 					break;
 				else
@@ -417,13 +616,13 @@ public class BlobVis extends JPanel {
 					sb.append(nn);
 					sb.append(",");
 				}
-				Blob rb = (Blob) r.get(BlobFuse.BLOBFIELD);
-				String noc = next != null?next.opCode():"nextnullish";
-				String roc = rb != null?rb.opCode():"rbnullish";
-				throw new RuntimeException("Failed to find " + next + "("
-						+ noc + ") as a child from " + r + "(" + rb
-						+ "," + roc + ")\nChildCount:"
-						+ r.getChildCount() + ": " + sb.toString());
+				Blob rb = (Blob) r.get(BFConstants.BLOBFIELD);
+				String noc = next != null ? next.opCode() : "nextnullish";
+				String roc = rb != null ? rb.opCode() : "rbnullish";
+				throw new RuntimeException("Failed to find " + next + "(" + noc
+						+ ") as a child from " + r + "(" + rb + "," + roc
+						+ ")\nChildCount:" + r.getChildCount() + ": "
+						+ sb.toString());
 			}
 			return nn;
 		}
@@ -457,6 +656,7 @@ public class BlobVis extends JPanel {
 				new BlobEdgeRenderer());
 		// dfr.add("ingroup('aggregates')", polyR);
 		m_vis.setRendererFactory(dfr);
+
 
 		if (filename == null)
 			filename = "hest";
@@ -495,8 +695,7 @@ public class BlobVis extends JPanel {
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(genColors());
-		setLayout();
-		force.add(lay);
+		force.add(new ForceDirectedLayout(GRAPH));
 		// force.add(AggrForce());
 		force.add(new RepaintAction());
 
@@ -517,62 +716,61 @@ public class BlobVis extends JPanel {
 		display.addControlListener(new BlobDragControl());
 		// display.addControlListener(new FocusControl(1));
 		display.addControlListener(new PanControl());
-		display.addControlListener(new ZoomControl());
+		// display.addControlListener(new ZoomControl());
 		display.addControlListener(new WheelZoomControl());
-		display.addControlListener(new ZoomToFitControl());
+
+		display.addControlListener(new PopupListener());
+		// display.addControlListener(new ZoomToFitControl());
 
 		JPanel panel = new JPanel();
-		
+		display.addMouseListener(new PopClickListener());
 
 		Box buttons = new Box(BoxLayout.Y_AXIS);
 		final JButton step = new JButton("Step model");
 		step.addActionListener(new SwitchAction());
 		step.setEnabled(true);
-		buttons.setBorder(BorderFactory
-				.createTitledBorder("Blob Model"));
+		buttons.setBorder(BorderFactory.createTitledBorder("Blob Model"));
 		buttons.add(step);
-		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
-                Short.MAX_VALUE));
-		
+		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE, Short.MAX_VALUE));
 
 		Box forcebuttons = new Box(BoxLayout.Y_AXIS);
-		final JButton pause = new JButton("Pause force movements");
+		pause = new JButton("Pause force movements");
 		pause.addActionListener(new PauseForceAction());
 		pause.setEnabled(true);
 		forcebuttons.add(pause);
 		forcebuttons.setBorder(BorderFactory
 				.createTitledBorder("Force simulation ctrl"));
 		forcebuttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
-                Short.MAX_VALUE));
+				Short.MAX_VALUE));
 
-		
-		
 		final JValueSlider slider = new JValueSlider("Distance", 0, 35, hops);
-        slider.addChangeListener(new ChangeListener() {
-            public void stateChanged(ChangeEvent e) {
-                filter.setDistance(slider.getValue().intValue());
-                m_vis.run("base");
-            }
-        });
-        
-        /*slider.setPreferredSize(new Dimension(300,30));
-        slider.setMaximumSize(new Dimension(300,30));*/
-        
-        Box cf = new Box(BoxLayout.Y_AXIS);
-        cf.setAlignmentX(Component.LEFT_ALIGNMENT);
-        cf.add(slider);
-        cf.setBorder(BorderFactory.createTitledBorder("Connectivity Filter"));
-        
-        Box boxpanel = new Box(BoxLayout.Y_AXIS);
+		slider.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				filter.setDistance(slider.getValue().intValue());
+				m_vis.run("base");
+			}
+		});
+
+		/*
+		 * slider.setPreferredSize(new Dimension(300,30));
+		 * slider.setMaximumSize(new Dimension(300,30));
+		 */
+
+		Box cf = new Box(BoxLayout.Y_AXIS);
+		cf.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cf.add(slider);
+		cf.setBorder(BorderFactory.createTitledBorder("Connectivity Filter"));
+
+		Box boxpanel = new Box(BoxLayout.Y_AXIS);
 		boxpanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		boxpanel.add(buttons);
 		boxpanel.add(Box.createVerticalStrut(20));
 		boxpanel.add(forcebuttons);
 		boxpanel.add(Box.createVerticalStrut(20));
 		boxpanel.add(cf);
-		
+
 		panel.add(boxpanel);
-		//panel.add(Box.createVerticalGlue());
+		// panel.add(Box.createVerticalGlue());
 
 		JSplitPane split = new JSplitPane();
 		split.setLeftComponent(display);
@@ -591,62 +789,57 @@ public class BlobVis extends JPanel {
 		m_vis.run("base");
 
 		if (!paused) {
-			m_vis.run("force");
+			startForce();
 			m_vis.cancel("pausedactions");
 		}
 
-		registerKeyboardAction(new SwitchAction(), "switchit", KeyStroke
-				.getKeyStroke("ctrl 1"), WHEN_FOCUSED);
-		display.registerKeyboardAction(new StepModelAction(), "switchit5",
-				KeyStroke.getKeyStroke("ctrl 5"), WHEN_FOCUSED);
-		/*
-		 * 
-		 * 
-		 * registerKeyboardAction(new PauseForceAction(), "pauseforce",
-		 * KeyStroke .getKeyStroke("P"), WHEN_FOCUSED);
-		 * 
-		 * registerKeyboardAction(new SingleForceAction(), "singleforce",
-		 * KeyStroke.getKeyStroke("S"), WHEN_FOCUSED);
-		 */
-
-		System.out.println("NodeCount: " + g.getNodeCount());
-
 	}
 
-	/*
-	 * private ActionList setupInit() { ActionList init = new ActionList(100);
-	 * init.add(genColors()); /* init.setPacingFunction(new
-	 * SlowInSlowOutPacer()); init.add(new QualityControlAnimator());
-	 * 
-	 * setLayout(); //init.add(lay); //init.add(AggrForce()); init.add((new
-	 * AggregateLayout(AGGR)));
-	 * 
-	 * /* init.add(new LocationAnimator(NODES));
-	 * 
-	 * init.add(new RepaintAction());
-	 * 
-	 * return init; }
-	 */
+	private void stopForce() {
+		m_vis.cancel("force");
+		pause.setText("Start force simulation");
+		paused = true;
+	}
 
-	/*
-	 * private Layout AggrForce() { ForceSimulator fsim = new ForceSimulator();
-	 * ForceDirectedLayout ret = null; fsim.addForce(new SpringForce());
-	 * fsim.addForce(new
-	 * NBodyForce());//5,NBodyForce.DEFAULT_MIN_DISTANCE,NBodyForce
-	 * .DEFAULT_THETA)); fsim.addForce(new DragForce()); ret = new
-	 * AggregateForceDirectedLayout(GRAPH, fsim, true); ret.setDataGroups(AGGR,
-	 * null); return ret; }
-	 */
+	private void startForce() {
+		m_vis.run("force");
+		pause.setText("Pause force simulation");
+		paused = false;
+	}
 
-	private void setLayout() {
-		if (tree) {
-			lay = new NodeLinkTreeLayout(GRAPH);
-			((NodeLinkTreeLayout) lay)
-					.setOrientation(Constants.ORIENT_TOP_BOTTOM);
-		} else {
-			lay = new ForceDirectedLayout(GRAPH);
+	/**
+	 * Stop force simulation, temporarily. Keep current state
+	 */
+	private void tmpStopForce() {
+		if (!paused) {
+			m_vis.cancel("force");
 		}
 	}
+
+	/**
+	 * Start force simulation if needed;
+	 */
+	private void tmpStartForce() {
+		if (!paused) {
+			m_vis.run("force");
+		}
+	}
+
+	/**
+	 * Toggle the force simulation
+	 * 
+	 * @return true if new state is "running"
+	 */
+	private boolean toggleForce() {
+		if (paused) {
+			startForce();
+			return true;
+		} else {
+			stopForce();
+			return false;
+		}
+	}
+
 
 	private ActionList col_cache = null;
 
@@ -694,7 +887,7 @@ public class BlobVis extends JPanel {
 					ColorLib.rgba(200, 255, 200, 170), // data
 			};
 			ColorAction nFillAdb = new DataColorAction(NODES,
-					BlobFuse.BLOBTYPE, Constants.NOMINAL, VisualItem.FILLCOLOR,
+					BFConstants.BLOBTYPE, Constants.NOMINAL, VisualItem.FILLCOLOR,
 					palette);
 
 			// bundle the color actions
@@ -739,17 +932,16 @@ public class BlobVis extends JPanel {
 
 	public void readProgramAndDataAsGraph(String filename) {
 		g = new Graph();
-		g.getNodeTable().addColumns(LABEL_SCHEMA);
-		g.addColumns(BlobFuse.BLOB_SCHEMA);
+		g.getNodeTable().addColumns(BFConstants.LABEL_SCHEMA);
+		g.getNodeTable().addColumns(BFConstants.BLOB_SCHEMA);
+		g.getEdgeTable().addColumns(BFConstants.EDGE_SCHEMA);
 		m = new Model();
 		m.readConfiguration(filename);
-		nodel = new HashMap<Blob, Node>();
-		nodelf = new ArrayList<Blob>();
+		bgf = new BlobGraphFuser(g, m, clickHandler);
 
 		vg = m_vis.addGraph(GRAPH, g);
-		dfsBlob(m.APB(), m);
+		bgf.populateGraphFromModelAPB();
 		vg = setGraph(g);
-
 		if (use_aggregate) {
 			fillAggregates(vg);
 		}
@@ -769,8 +961,8 @@ public class BlobVis extends JPanel {
 
 		for (Iterator<VisualItem> iterator = vg.nodes(); iterator.hasNext();) {
 			VisualItem type = iterator.next();
-			if (type.canGet(BlobFuse.BLOBINPGR, Boolean.class)) {
-				boolean b = (Boolean) type.get(BlobFuse.BLOBINPGR);
+			if (type.canGet(BFConstants.BLOBINPGR, Boolean.class)) {
+				boolean b = (Boolean) type.get(BFConstants.BLOBINPGR);
 				if (b) {
 					pgr.addItem(type);
 				} else {
@@ -785,38 +977,38 @@ public class BlobVis extends JPanel {
 	private String genGraph(String type) {
 		if ("hest".equals(type)) {
 			Node n = g.addNode();
-			n.setString(LABEL, "Node1");
+			n.setString(BFConstants.LABEL, "Node1");
 
 			Node n1 = g.addNode();
 			g.addEdge(n, n1);
-			n1.setString(LABEL, "Node1.1");
+			n1.setString(BFConstants.LABEL, "Node1.1");
 
 			Node n2 = g.addNode();
 			g.addEdge(n, n2);
-			n2.setString(LABEL, "Node1.2");
+			n2.setString(BFConstants.LABEL, "Node1.2");
 
 			Node n3 = g.addNode();
 			g.addEdge(n1, n3);
-			n3.setString(LABEL, "Node1.1.1");
+			n3.setString(BFConstants.LABEL, "Node1.1.1");
 		} else if ("ko".equals(type)) {
 			Node n = g.addNode();
-			n.setString(LABEL, "KoNode1");
+			n.setString(BFConstants.LABEL, "KoNode1");
 
 			Node n1 = g.addNode();
 			g.addEdge(n, n1);
-			n1.setString(LABEL, "KoNode1.1");
+			n1.setString(BFConstants.LABEL, "KoNode1.1");
 
 			Node n2 = g.addNode();
 			g.addEdge(n, n2);
 			g.addEdge(n2, n1);
-			n2.setString(LABEL, "KoNode1.2");
+			n2.setString(BFConstants.LABEL, "KoNode1.2");
 
 			Node n3 = g.addNode();
 			g.addEdge(n1, n3);
 
-			n3.setString(LABEL, "KoNode1.1.1");
+			n3.setString(BFConstants.LABEL, "KoNode1.1.1");
 		} else if ("blob".equals(type)) {
-			g.addColumns(BlobFuse.BLOB_SCHEMA);
+			g.addColumns(BFConstants.BLOB_SCHEMA);
 			Blob pb1 = new Blob(1);
 			Blob pb2 = new Blob(2);
 			Blob pb3 = new Blob(3);
@@ -839,77 +1031,34 @@ public class BlobVis extends JPanel {
 			Blob.link(db4, db22, BondSite.South, BondSite.West);
 			// The bug
 			Blob.link(pb1, db1, BondSite.North, BondSite.North);
+			m = new Model();
+			m.addBlob(pb1);
+			m.addBlob(pb2);
+			m.addBlob(pb3);
+			m.addBlob(pb4);
+			m.addBlob(db1);
+			m.addBlob(db2);
+			m.addBlob(db22);
+			m.addBlob(db3);
+			m.addBlob(db4);
 
-			nodel = new HashMap<Blob, Node>();
-			nodelf = new ArrayList<Blob>();
-			dfsBlob(pb1, null);
-
+			bgf = new BlobGraphFuser(g,m,clickHandler);
+			bgf.populateGraphFromModelAPB();
 		}
 		return type;
 	}
 
-	Map<Blob, Node> nodel;
-	List<Blob> nodelf;
 
-	boolean inpgr = true;
 
-	private Node dfsBlob(Blob pb1, Model m) {
-		Blob cur = pb1;
-
-		if (!nodel.containsKey(cur)) {
-			Node n = g.addNode();
-			nodel.put(cur, n);
-
-			if (m.APB().equals(cur)) {
-				n.set(BlobFuse.BLOBTYPE, 1);
-			} else if (m.ADB().equals(cur)) {
-				n.set(BlobFuse.BLOBTYPE, 2);
-			} else if (inpgr) {
-				n.set(BlobFuse.BLOBTYPE, 3);
-			} else {
-				n.set(BlobFuse.BLOBTYPE, 4);
-			}
-
-			n.set(BlobFuse.BLOBFIELD, cur);
-			if (inpgr) {
-				n.setString(LABEL, "" + cur.opCode());
-			} else {
-				n.setString(LABEL, "" + cur.getCargo());
-			}
-			n.set(BlobFuse.BLOBINPGR, inpgr);
-			for (int i = 3; i >= 0; i--) {
-				Blob bn = cur.follow(BondSite.create(i));
-
-				if (bn != null) {
-
-					Node nn = null;
-					if (!nodel.containsKey(bn)) {
-						if (i == 0 && inpgr) {
-							inpgr = false;
-						}
-						nn = dfsBlob(bn, m);
-					} else if (!nodelf.contains(bn)) {
-						nn = nodel.get(bn);
-					}
-					if (nn != null) {
-						if (g.getEdge(nn, n) == null) {
-							Edge e = g.addEdge(n, nn);
-							e.set(BlobFuse.EDGENUMBERSRC, i);
-							BondSite otherend = bn.boundTo(cur);
-							if (otherend != null) {
-								e.set(BlobFuse.EDGENUMBERTAR, otherend
-										.ordinal());
-
-							}
-						}
-					}
-				}
-			}
-			nodelf.add(cur);
-
+	private ControlAdapter clickHandler = new ControlAdapter() {
+		@Override
+		public void itemClicked(VisualItem item, MouseEvent e) {
+			PopUpDemo menu = new PopUpDemo(item);
+			menu.show(m_vis.getDisplay(0), e.getX(), e.getY());
 		}
-		return nodel.get(cur);
-	}
+	};
+
+
 
 	public static void main(String[] argv) {
 		String filename = null;
@@ -933,11 +1082,8 @@ public class BlobVis extends JPanel {
 		return frame;
 	}
 
-	/** Label data field included in generated Graphs */
-	public static final String LABEL = "label";
-	/** Node table schema used for generated Graphs */
-	public static final Schema LABEL_SCHEMA = new Schema();
-	static {
-		LABEL_SCHEMA.addColumn(LABEL, String.class, "");
-	}
+	private final JButton pause;
+
+	private BlobGraphFuser bgf;
+
 }

@@ -50,7 +50,7 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 				|| !item2.canGet(BlobFuse.BLOBFIELD, Blob.class)) {
 			return;
 		}*/
-		if (!edge.canGet(BlobFuse.EDGENUMBERSRC, Integer.class)){
+		if (!edge.canGet(BFConstants.EDGENUMBERSRC, Integer.class)){
 			return;
 		}
 		
@@ -66,8 +66,8 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 /*
 		Blob from = (Blob) item1.get(BlobFuse.BLOBFIELD);
 		Blob to = (Blob) item2.get(BlobFuse.BLOBFIELD);*/
-		int bsf = (Integer)edge.get(BlobFuse.EDGENUMBERSRC);
-		int bst = (Integer)edge.get(BlobFuse.EDGENUMBERTAR);
+		int bsf = (Integer)edge.get(BFConstants.EDGENUMBERSRC);
+		int bst = (Integer)edge.get(BFConstants.EDGENUMBERTAR);
 		/*if (to.boundTo(from) != null){
 			bst = to.boundTo(from).ordinal();
 		}*/

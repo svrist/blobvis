@@ -104,7 +104,7 @@ class BlobDragControl extends ControlAdapter {
 		down.setLocation(temp);
 	}
 
-	
+
 	protected static void setFixed(VisualItem item, boolean fixed) {
 		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
@@ -112,11 +112,11 @@ class BlobDragControl extends ControlAdapter {
 				setFixed(items.next(), fixed);
 			}
 		} else {*/
-			item.setFixed(fixed);
+		item.setFixed(fixed);
 		/*}*/
 	}
 
-	
+
 	protected static void move(VisualItem item, double dx, double dy) {
 		/*if ( item instanceof AggregateItem ) {
 			Iterator<VisualItem> items = ((AggregateItem)item).items();
@@ -124,11 +124,11 @@ class BlobDragControl extends ControlAdapter {
 				move(items.next(), dx, dy);
 			}
 		}else{*/
-			double x = item.getX();
-			double y = item.getY();
-			item.setStartX(x);  item.setStartY(y);
-			item.setX(x+dx);    item.setY(y+dy);
-			item.setEndX(x+dx); item.setEndY(y+dy);
+		double x = item.getX();
+		double y = item.getY();
+		item.setStartX(x);  item.setStartY(y);
+		item.setX(x+dx);    item.setY(y+dy);
+		item.setEndX(x+dx); item.setEndY(y+dy);
 		/*}*/
 
 	}
