@@ -1,0 +1,73 @@
+private String genGraph(String type) {
+		if ("hest".equals(type)) {
+			Node n = g.addNode();
+			n.setString(BFConstants.LABEL, "Node1");
+
+			Node n1 = g.addNode();
+			g.addEdge(n, n1);
+			n1.setString(BFConstants.LABEL, "Node1.1");
+
+			Node n2 = g.addNode();
+			g.addEdge(n, n2);
+			n2.setString(BFConstants.LABEL, "Node1.2");
+
+			Node n3 = g.addNode();
+			g.addEdge(n1, n3);
+			n3.setString(BFConstants.LABEL, "Node1.1.1");
+		} else if ("ko".equals(type)) {
+			Node n = g.addNode();
+			n.setString(BFConstants.LABEL, "KoNode1");
+
+			Node n1 = g.addNode();
+			g.addEdge(n, n1);
+			n1.setString(BFConstants.LABEL, "KoNode1.1");
+
+			Node n2 = g.addNode();
+			g.addEdge(n, n2);
+			g.addEdge(n2, n1);
+			n2.setString(BFConstants.LABEL, "KoNode1.2");
+
+			Node n3 = g.addNode();
+			g.addEdge(n1, n3);
+
+			n3.setString(BFConstants.LABEL, "KoNode1.1.1");
+		} else if ("blob".equals(type)) {
+			g.addColumns(BFConstants.BLOB_SCHEMA);
+			Blob pb1 = new Blob(1);
+			Blob pb2 = new Blob(2);
+			Blob pb3 = new Blob(3);
+			Blob pb4 = new Blob(4);
+			Blob.link(pb1, pb2, BondSite.South, BondSite.East);
+			Blob.link(pb2, pb3, BondSite.South, BondSite.East);
+			Blob.link(pb2, pb4, BondSite.West, BondSite.East);
+
+			Blob db1 = new Blob(10);
+			Blob db2 = new Blob(20);
+			Blob db22 = new Blob(202);
+			Blob db3 = new Blob(30);
+			Blob db4 = new Blob(40);
+
+			Blob.link(db1, db2, BondSite.South, BondSite.East);
+			Blob.link(db1, db22, BondSite.West, BondSite.East);
+
+			Blob.link(db2, db3, BondSite.South, BondSite.East);
+			Blob.link(db3, db4, BondSite.South, BondSite.East);
+			Blob.link(db4, db22, BondSite.South, BondSite.West);
+			// The bug
+			Blob.link(pb1, db1, BondSite.North, BondSite.North);
+			m = new Model();
+			m.addBlob(pb1);
+			m.addBlob(pb2);
+			m.addBlob(pb3);
+			m.addBlob(pb4);
+			m.addBlob(db1);
+			m.addBlob(db2);
+			m.addBlob(db22);
+			m.addBlob(db3);
+			m.addBlob(db4);
+
+			bgf = new BlobGraphFuser(g, m, clickHandler);
+			bgf.populateGraphFromModelAPB();
+		}
+		return type;
+	}
