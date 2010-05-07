@@ -17,8 +17,10 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.prefs.Preferences;
 
 import javax.swing.AbstractAction;
@@ -263,7 +265,7 @@ public class BlobVis extends JPanel {
 		numformat.setMaximum(127);
 		final JFormattedTextField cargoinput = new JFormattedTextField(
 				numformat);
-		cargoinput.setValue(127);
+		cargoinput.setValue(b.getCargo());
 
 		ok.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -304,17 +306,107 @@ public class BlobVis extends JPanel {
 	}
 
 	protected void addVisualBlob(VisualItem item) {
-		System.out.println(item+":"+bgf.getBlob(item));
-		AddBlobData abd = getAddBlobData(bgf.getBlob(item));
+		AddBlobData abd = getAddBlobData(bgf.getBlob(item)); // Show a dialog for a new blob
 		if (abd.ok) {
-			bgf.saveRoot();
+			bgf.saveRoot();// turns out that adding a node resets the spanning grah.
+			// this saveRoot + resetRoot ensures that the root is preserved after addition
+			// of a new data blob
 			bgf.addDataBlobToBondSite(item, abd.fromBs, abd.toBs, abd.cargo);
 			bgf.resetRoot();
 		}
 	}
 
-	private void showAddBlobGridDialog() {
+	private static Random randGen = new Random();
+	private void showAddBlobGridDialog(VisualItem item) {
+		Blob b = bgf.getBlob(item);
+		AddGridData agd = getAddGridData(b);
+		List<Blob> work = new ArrayList<Blob>();
+		work.add(b);
 
+		if (agd.countNodes >0){
+			int count = agd.countNodes;
+			while(count >0 && work.size() > 0){
+				Blob cur = work.remove(0);
+				List<BondSite> freeBs = Blob.emptyBondSites(cur);
+
+				int card = randGen.nextInt(freeBs.size());
+				Collections.shuffle(freeBs);
+				List<BondSite> newsites = new ArrayList<BondSite>(freeBs.subList(0, card));
+				for (BondSite bs : newsites) {
+					//bgf.addDataBlobToBondSite(item, from, to, cargo)
+
+				}
+
+
+
+
+
+			}
+
+
+		}
+	}
+
+	private AddGridData getAddGridData(Blob blob) {
+		Component c = this;
+		final AddGridData agd = new AddGridData();
+
+		// -- build the dialog -----
+		// we need to get the enclosing frame first
+		while (c != null && !(c instanceof JFrame)) {
+			c = c.getParent();
+		}
+		final JDialog dialog = new JDialog((JFrame) c, "Add new Blob", true);
+
+		// create the ok/cancel buttons
+		final JButton ok = new JButton("OK");
+
+		JButton cancel = new JButton("Cancel");
+		cancel.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				agd.countNodes = 0;
+				dialog.setVisible(false);
+			}
+		});
+
+		Box bbox = new Box(BoxLayout.X_AXIS);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(Box.createHorizontalGlue());
+		bbox.add(ok);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(cancel);
+		bbox.add(Box.createHorizontalStrut(5));
+		// put everything into a panel
+		JPanel panel = new JPanel(new MigLayout());
+		NumberFormatter numformat = new NumberFormatter(NumberFormat
+				.getIntegerInstance());
+		numformat.setMinimum(1);
+		numformat.setMaximum(100);
+		final JFormattedTextField numberinput = new JFormattedTextField(
+				numformat);
+		numberinput.setValue(10);
+		ok.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				agd.countNodes = (Integer) numberinput.getValue();
+				dialog.setVisible(false);
+			}
+		});
+
+		panel.add(new JLabel("Blobs: "));
+		panel.add(numberinput,"wrap");
+		panel.add(bbox,"span, gapleft push");
+
+		// show the dialog
+		dialog.setContentPane(panel);
+		dialog.pack();
+		dialog.setLocationRelativeTo(c);
+		dialog.setVisible(true);
+		dialog.dispose();
+
+
+
+
+		return agd;
 	}
 
 	class PopUpDemo extends JPopupMenu {
@@ -333,7 +425,7 @@ public class BlobVis extends JPanel {
 			anItem.addActionListener(new AbstractAction() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					showAddBlobGridDialog();
+					showAddBlobGridDialog(vi);
 				}
 
 			});
