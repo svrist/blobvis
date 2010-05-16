@@ -64,7 +64,6 @@ import prefuse.action.assignment.DataColorAction;
 import prefuse.action.assignment.FontAction;
 import prefuse.action.filter.GraphDistanceFilter;
 import prefuse.action.layout.Layout;
-import prefuse.action.layout.RandomLayout;
 import prefuse.action.layout.graph.ForceDirectedLayout;
 import prefuse.action.layout.graph.RadialTreeLayout;
 import prefuse.controls.Control;
@@ -85,7 +84,6 @@ import prefuse.visual.AggregateItem;
 import prefuse.visual.AggregateTable;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
-import prefuse.visual.sort.TreeDepthItemSorter;
 
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
@@ -134,7 +132,7 @@ public class BlobVis extends JPanel {
 			m_vis.cancel("basepaused");
 
 			toggleForce();
-			
+
 
 		}
 
@@ -149,7 +147,7 @@ public class BlobVis extends JPanel {
 		@Override
 		public String toString() {
 			return "AddBlobData [cargo=" + cargo + ", fromBs=" + fromBs
-					+ ", ok=" + ok + ", toBs=" + toBs + "]";
+			+ ", ok=" + ok + ", toBs=" + toBs + "]";
 		}
 
 	}
@@ -477,7 +475,7 @@ public class BlobVis extends JPanel {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			
+
 			tmpRunForce1s();
 			synchronized (m_vis) {
 				if (ended) {
@@ -515,7 +513,7 @@ public class BlobVis extends JPanel {
 					adbnnext = findNode(adbn, adb);
 				} else if (apb.opCode().startsWith("SBS")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 					Blob bb1 = adb.follow(b1);
 					Blob bb2 = adb.follow(b2);
@@ -528,7 +526,7 @@ public class BlobVis extends JPanel {
 
 				} else if (apb.opCode().startsWith("JN")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob dest1 = adb.follow(b1);
@@ -540,18 +538,13 @@ public class BlobVis extends JPanel {
 						linkNodes(adbn, b1, destn, ds);
 					} else {
 						Node n = findNode(adbn, dest1);
-						Edge ne = g.getEdge(adbn, n);
-						if (ne != null) {
-							g.removeEdge(ne);
-							ne = g.getEdge(n, adbn);
-							if (ne != null) {
-								g.removeEdge(ne);
-							}
-						}
+						System.out.println("Removing "+adbn+"->"+n);
+						removeEdge(adbn,n);
+
 					}
 				} else if (apb.opCode().startsWith("SWL")) {
 					BondSite b1 = BondSite
-							.create(((8 + 4) & m.APB().getCargo()) / 4);
+					.create(((8 + 4) & m.APB().getCargo()) / 4);
 					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
 
 					Blob adb_b1 = m.ADB().follow(b1);
@@ -585,7 +578,7 @@ public class BlobVis extends JPanel {
 								// -> b2.b1=null,b1=x
 								// TODO: adb_b2.unlink( b1 );
 								removeEdge(adb_b2n, adb_b2_b1n);
-								
+
 							}
 						} else if (adb_b1 != null) {
 							// case 3: Something(x) on b1 and nothing on b2.b1
@@ -629,7 +622,7 @@ public class BlobVis extends JPanel {
 					}
 					stopForce();
 				}
-				
+
 
 			}
 		}
@@ -651,7 +644,7 @@ public class BlobVis extends JPanel {
 			rems.addAll(gatherRemoveList(b2, n2));
 			for (Edge element : rems) {
 				Edge edge = element;
-				g.removeEdge(edge);
+				removeEdge(edge.getSourceNode(),edge.getTargetNode());
 			}
 			Edge ne = g.addEdge(n1, n2);
 			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
@@ -667,16 +660,7 @@ public class BlobVis extends JPanel {
 				Edge ce = (Edge) removeIterator.next();
 				String field = ce.getSourceNode() == n ? BFConstants.EDGENUMBERSRC
 						: BFConstants.EDGENUMBERTAR;
-				/*
-				 * String field2 = ce.getSourceNode() != n ?
-				 * BlobFuse.EDGENUMBERSRC : BlobFuse.EDGENUMBERTAR;
-				 */
 				int bsi = (Integer) ce.get(field);
-				// int tar = (Integer) ce.get(field2);
-				/*
-				 * System.out.println("edge: " + bsi + "->" + tar + " == " +
-				 * needle + "." + needle.ordinal());
-				 */
 				if (bsi == needle.ordinal()) {
 					rems.add(ce);
 				}
@@ -727,13 +711,15 @@ public class BlobVis extends JPanel {
 				g.removeEdge(e2);
 			}
 			if (g.getDegree(n1) == 0){
+				System.out.println(n1+" went superflous. Removing");
 				g.removeNode(n1);
 			}
 			if (g.getDegree(n2) == 0){
+				System.out.println(n2+" went superflous. Removing");
 				g.removeNode(n2);
 			}
-			
-			
+
+
 		}
 
 		private void stepModel(Node r, Node nn) {
@@ -807,11 +793,11 @@ public class BlobVis extends JPanel {
 	public BlobVis(String filename) {
 		super(new BorderLayout());
 		m_vis = new Visualization();
-		
+
 
 		LabelRenderer tr = new LabelRenderer();
 		tr.setRoundedCorner(8, 8);
-		 
+
 
 		/*
 		 * Renderer polyR = new
@@ -842,13 +828,13 @@ public class BlobVis extends JPanel {
 		base.add(filter);
 		base.add(genColors()); // base.add(new AggregateLayout(AGGR));
 		base.add(new RepaintAction());
-		
+
 		ActionList basePaused = new ActionList(1000);
 		basePaused.add(filter);
 		basePaused.add(genColors()); // base.add(new AggregateLayout(AGGR));
 		basePaused.add(new RepaintAction());
 		m_vis.putAction("basepaused", basePaused);
-		
+
 
 		ActionList pausedActions = new ActionList(500);
 		pausedActions.add(new VisibilityAnimator());
@@ -976,7 +962,7 @@ public class BlobVis extends JPanel {
 	 * Stop force simulation, temporarily. Keep current state
 	 */
 	private void tmpStopForce() {
-			m_vis.cancel("force");
+		m_vis.cancel("force");
 	}
 
 	/**
@@ -989,14 +975,14 @@ public class BlobVis extends JPanel {
 			m_vis.cancel("force");
 		}
 	}
-	
+
 	/**
 	 * Start force simulation if needed;
 	 */
 	private void tmpStartForce() {
-			m_vis.run("force");
+		m_vis.run("force");
 	}
-	
+
 
 	/**
 	 * Toggle the force simulation
@@ -1174,7 +1160,7 @@ public class BlobVis extends JPanel {
 			}
 		};
 		t.addPropertyChangeListener(new PropertyChangeListener() {
-			boolean canceled = false; 
+			boolean canceled = false;
 			@Override
 			public void propertyChange(PropertyChangeEvent evt) {
 				if ("progress" == evt.getPropertyName()) {
@@ -1195,9 +1181,9 @@ public class BlobVis extends JPanel {
 						progressMonitor.close();
 						canceled = true;
 					} else if (canceled == false) {
-						
+
 						ended = false;
-						
+
 						runEverything();
 						enableButtons();
 					}

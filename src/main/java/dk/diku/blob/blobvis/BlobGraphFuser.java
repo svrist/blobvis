@@ -2,7 +2,6 @@ package dk.diku.blob.blobvis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -67,14 +66,52 @@ public class BlobGraphFuser {
 
 		int count = 0;
 
+		class BlobStackEntry {
+			@Override
+			public int hashCode() {
+				return b.hashCode();
+			}
+			@Override
+			public boolean equals(Object obj) {
+				if (this == obj)
+					return true;
+				if (obj == null)
+					return false;
+				if (getClass() == obj.getClass()){
+					BlobStackEntry other = (BlobStackEntry) obj;
+					if (b == null) {
+						if (other.b != null)
+							return false;
+					} else if (!b.equals(other.b))
+						return false;
+					return true;
+				}else if (obj.getClass()==b.getClass()){
+					return b.equals(obj);
+				}else{
+					return false;
+				}
+			}
+			Blob b;
+			boolean inPgr;
+			public BlobStackEntry(Blob b, boolean inPgr) {
+				super();
+				this.b = b;
+				this.inPgr = inPgr;
+			}
+			private DFSBlob getOuterType() {
+				return DFSBlob.this;
+			}
+
+		}
+
 		private void it_dfsBlob(Blob start) throws InterruptedException {
-			Stack<Blob> nextStack = new Stack<Blob>();
+			Stack<Pair<Blob,Boolean>> nextStack = new Stack<Pair<Blob,Boolean>>();
 			Stack<Blob> traversed = new Stack<Blob>();
 			Map<Blob, List<Blob>> edges = new HashMap<Blob, List<Blob>>();
 
 			// Enqueue root
-			nextStack.add(start);
-			double mcount = (double) m.count();
+			nextStack.add(new Pair(start,true));
+			double mcount = m.count();
 
 			while (!nextStack.isEmpty()) {
 				if (count % 10 == 0) {
@@ -83,43 +120,53 @@ public class BlobGraphFuser {
 				count++;
 				// Dequeue next node for comparison
 				// And add it 2 list of traversed nodes
-				Blob b = nextStack.pop();
+				Pair<Blob,Boolean> pb = nextStack.pop();
+				Blob b = pb.one;
 				traversed.push(b);
-				addBlobAsNode(b);
+				addBlobAsNode(b,pb.two);
 				// empty any waiting edges. This node is now ready
 				popEdges(edges, b);
-
 				// Enqueue new neighbors
 				for (BondSite bs : BondSite.asList()) {
+					Boolean inp = pb.two;
 					Blob neighbor = b.follow(bs);
 					if (neighbor == null)
 						continue;
+					Pair<Blob,Boolean> newbse = new Pair<Blob,Boolean>(neighbor,inp);
 					if (!traversed.contains(neighbor)
-							&& !nextStack.contains(neighbor)) {
-						nextStack.push(neighbor);
+							&& !nextStack.contains(newbse)) {
+						if (bs.equals(BondSite.North)){
+							newbse.two = !inp;
+						}
+						nextStack.push(newbse);
 					}
-					if (nextStack.contains(neighbor)) {
+					if (nextStack.contains(newbse)) {
 						// Save edges for all childs in a list.
 						stackEdge(edges, b, neighbor);
 					}
 				}
-			if (Thread.interrupted()){
-				throw new InterruptedException();
+				if (Thread.interrupted()){
+					throw new InterruptedException();
+				}
+
 			}
-			
-			}
-			
+
 		}
 
-		private void popEdges(Map<Blob, List<Blob>> edges, Blob b) {
+		private boolean popEdges(Map<Blob, List<Blob>> edges, Blob b) {
 			// Empty edge list for this node.
+			boolean viaNorth=false;
 			if (edges.containsKey(b)) {
 				for (Blob prev : edges.get(b)) {
 					Node n = bton.get(prev);
 					Node nn = bton.get(b);
+					if (prev.boundTo(b).equals(BondSite.North)){
+						viaNorth = true;
+					}
 					BlobGraphFuser.addEdge(g, n, prev, nn, b);
 				}
 			}
+			return viaNorth;
 		}
 
 		private Node dfsBlob(Blob pb1) {
@@ -177,10 +224,13 @@ public class BlobGraphFuser {
 			}
 			return bton.get(cur);
 		}
-
 		private Node addBlobAsNode(Blob cur) {
-			Node n = BlobGraphFuser.addNode(g, cur, inpgr);
-			if (!inpgr) {
+			return addBlobAsNode(cur,inpgr);
+		}
+
+		private Node addBlobAsNode(Blob cur,boolean inPgr) {
+			Node n = BlobGraphFuser.addNode(g, cur, inPgr);
+			if (!inPgr) {
 				BlobGraphFuser.setNodeRightClickHandler(n, clickHandler);
 			}
 			bton.put(cur, n);
