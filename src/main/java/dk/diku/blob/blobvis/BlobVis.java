@@ -484,6 +484,7 @@ public class BlobVis extends JPanel {
 				}
 
 				Node r = bgf.getRoot();
+				boolean reread = false;
 				Blob apb = (Blob) r.get(BFConstants.BLOBFIELD);
 				Blob adb = apb.follow(BondSite.North);
 				BondSite apbBsNext = BondSite.South;
@@ -506,11 +507,22 @@ public class BlobVis extends JPanel {
 						 */
 						apbBsNext = BondSite.West;
 					}
+				} else if (apb.opCode().startsWith("DBS")) {
+					reread = true;
 				} else if (apb.opCode().startsWith("CHD")) {
 					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
 					adb = m.ADB().follow(b);
 					// g.removeEdge(g.getEdge)
 					adbnnext = findNode(adbn, adb);
+
+				} else if (apb.opCode().startsWith("JCG")){
+					int c = ( 4 + 2 + 1 ) & apb.getCargo();
+					if (adb.getCargo(c)){
+						apbBsNext = BondSite.South;
+					}else{
+						apbBsNext = BondSite.West;
+					}
+
 				} else if (apb.opCode().startsWith("SBS")) {
 					BondSite b1 = BondSite
 					.create(((8 + 4) & m.APB().getCargo()) / 4);
@@ -612,6 +624,9 @@ public class BlobVis extends JPanel {
 				Node nn = findNode(r, next);
 				updateTheBug(r, nn, adbn, adbnnext);
 				stepModel(r, nn);
+				if (reread){
+					bgf.rereadCargo(m.ADB());
+				}
 
 				if (next.opCode().equals("EXT")) {
 					ended = true;
@@ -811,7 +826,7 @@ public class BlobVis extends JPanel {
 
 		// now create the main layout routine
 		ActionList init = new ActionList();
-		filter = new GraphDistanceFilter(GRAPH, hops);
+		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS,hops);
 		init.add(filter);
 		init.add(genColors());
 		init.add(new RadialTreeLayout(GRAPH));
@@ -819,6 +834,7 @@ public class BlobVis extends JPanel {
 		init.add(new RepaintAction());
 
 		ActionList singleforce = new ActionList(1000);
+		singleforce.add(filter);
 		singleforce.add(genColors());
 		singleforce.add(new ForceDirectedLayout(GRAPH));
 		singleforce.add(new RepaintAction());
@@ -843,6 +859,7 @@ public class BlobVis extends JPanel {
 		m_vis.alwaysRunAfter("pausedactions", "basepaused");
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
+		force.add(filter);
 		force.add(genColors());
 		force.add(new ForceDirectedLayout(GRAPH));
 		// force.add(AggrForce());
@@ -1169,9 +1186,6 @@ public class BlobVis extends JPanel {
 					String message = String.format("Completed %d%%.\n",
 							progress);
 					progressMonitor.setNote(message);
-
-				} else if ("state".equals(evt.getPropertyName())) {
-					System.out.println("State: " + evt.getNewValue());
 				}
 				if (progressMonitor.isCanceled() || t.isDone()) {
 					if (progressMonitor.isCanceled()) {

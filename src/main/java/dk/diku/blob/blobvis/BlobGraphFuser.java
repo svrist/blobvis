@@ -387,4 +387,14 @@ public class BlobGraphFuser {
 		return root;
 	}
 
+	public void rereadCargo(Blob b) {
+		Node n = bton.get(b);
+		boolean inp = (Boolean)n.get(BFConstants.BLOBINPGR);
+		if (inp){
+			n.setString(BFConstants.LABEL,b.opCode());
+		}else{
+			n.setString(BFConstants.LABEL,b.getCargo()+"");
+		}
+	}
+
 }
