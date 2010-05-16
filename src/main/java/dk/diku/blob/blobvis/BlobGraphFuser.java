@@ -2,8 +2,10 @@ package dk.diku.blob.blobvis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import model.Blob;
 import model.BondSite;
@@ -43,7 +45,7 @@ public class BlobGraphFuser {
 		this.vg = vg;
 	}
 
-	private class DFSBlob implements Runnable{
+	private class DFSBlob {
 
 		boolean inpgr = true;
 		Blob start;
@@ -58,39 +60,88 @@ public class BlobGraphFuser {
 			this.start = start;
 		}
 
-		public void run() {
-			dfsBlob(start);
+		public void run() throws InterruptedException {
+			it_dfsBlob(start);
 			saveRoot(bton.get(start));
 		}
 
 		int count = 0;
 
+		private void it_dfsBlob(Blob start) throws InterruptedException {
+			Stack<Blob> nextStack = new Stack<Blob>();
+			Stack<Blob> traversed = new Stack<Blob>();
+			Map<Blob, List<Blob>> edges = new HashMap<Blob, List<Blob>>();
+
+			// Enqueue root
+			nextStack.add(start);
+			double mcount = (double) m.count();
+
+			while (!nextStack.isEmpty()) {
+				if (count % 10 == 0) {
+					p.progress((int) ((traversed.size() / mcount) * 100));
+				}
+				count++;
+				// Dequeue next node for comparison
+				// And add it 2 list of traversed nodes
+				Blob b = nextStack.pop();
+				traversed.push(b);
+				addBlobAsNode(b);
+				// empty any waiting edges. This node is now ready
+				popEdges(edges, b);
+
+				// Enqueue new neighbors
+				for (BondSite bs : BondSite.asList()) {
+					Blob neighbor = b.follow(bs);
+					if (neighbor == null)
+						continue;
+					if (!traversed.contains(neighbor)
+							&& !nextStack.contains(neighbor)) {
+						nextStack.push(neighbor);
+					}
+					if (nextStack.contains(neighbor)) {
+						// Save edges for all childs in a list.
+						stackEdge(edges, b, neighbor);
+					}
+				}
+			if (Thread.interrupted()){
+				throw new InterruptedException();
+			}
+			
+			}
+			
+		}
+
+		private void popEdges(Map<Blob, List<Blob>> edges, Blob b) {
+			// Empty edge list for this node.
+			if (edges.containsKey(b)) {
+				for (Blob prev : edges.get(b)) {
+					Node n = bton.get(prev);
+					Node nn = bton.get(b);
+					BlobGraphFuser.addEdge(g, n, prev, nn, b);
+				}
+			}
+		}
+
 		private Node dfsBlob(Blob pb1) {
-			/*
-			 * if (count%10==0){ p.progress((int)
-			 * ((nodelf.size()/(double)m.count())*100)); } count++;
-			 */
+
+			if (count % 10 == 0) {
+				p.progress((int) ((nodelf.size() / (double) m.count()) * 100));
+			}
+			count++;
+
 			Blob cur = pb1;
 
 			if (!bton.containsKey(cur)) {
-				Node n = BlobGraphFuser.addNode(g, cur, inpgr);
-				if (!inpgr) {
-					BlobGraphFuser.setNodeRightClickHandler(n, clickHandler);
-				}
-				bton.put(cur, n);
-				ntob.put(n.getRow(), cur);
-				if (m.APB().equals(cur)) {
-					BlobGraphFuser.setNodeApb(n);
-				} else if (m.ADB().equals(cur)) {
-					BlobGraphFuser.setNodeAdb(n);
-				}
-				/*if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
-					// System.out.println("addEdge:"+n+"->"+nn+"(bn:"+bn+")");
-					System.out.println(cur.follow(BondSite.North) + ","
-							+ cur.follow(BondSite.East)+","
-							+ cur.follow(BondSite.South)+","
-							+ cur.follow(BondSite.West));
-				}*/
+				Node n = addBlobAsNode(cur);
+				/*
+				 * if (cur.opCode().equals("EXT") ||
+				 * cur.opCode().equals("JB 1")) { //
+				 * System.out.println("addEdge:"+n+"->"+nn+"(bn:"+bn+")");
+				 * System.out.println(cur.follow(BondSite.North) + "," +
+				 * cur.follow(BondSite.East)+"," +
+				 * cur.follow(BondSite.South)+"," + cur.follow(BondSite.West));
+				 * }
+				 */
 				for (int i = 3; i >= 0; i--) {
 					BondSite bs = BondSite.create(i);
 					Blob bn = cur.follow(bs);
@@ -103,17 +154,22 @@ public class BlobGraphFuser {
 							nn = dfsBlob(bn);
 						} else if (!nodelf.contains(bn)) {
 							nn = bton.get(bn);
-						}else{
-							/*System.out.println("bn: "+bn+":"+bn.opCode()+"="+bton.containsKey(bn)+"-"+nodelf.contains(bn));
-							System.out.println(bn.follow(BondSite.North) + ","
-									+ bn.follow(BondSite.East)+","
-									+ bn.follow(BondSite.South)+","
-									+ bn.follow(BondSite.West));*/
+						} else {
+							/*
+							 * System.out.println("bn: "+bn+":"+bn.opCode()+"="+bton
+							 * .containsKey(bn)+"-"+nodelf.contains(bn));
+							 * System.out.println(bn.follow(BondSite.North) +
+							 * "," + bn.follow(BondSite.East)+"," +
+							 * bn.follow(BondSite.South)+"," +
+							 * bn.follow(BondSite.West));
+							 */
 						}
-						/*	if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
-							System.out.println("addEdge:" + n + "->" + nn
-									+ "(bn:" + bn + ")");
-						}*/
+						/*
+						 * if (cur.opCode().equals("EXT") ||
+						 * cur.opCode().equals("JB 1")) {
+						 * System.out.println("addEdge:" + n + "->" + nn +
+						 * "(bn:" + bn + ")"); }
+						 */
 						BlobGraphFuser.addEdge(g, n, cur, bs, nn, bn);
 					}
 				}
@@ -122,15 +178,46 @@ public class BlobGraphFuser {
 			return bton.get(cur);
 		}
 
+		private Node addBlobAsNode(Blob cur) {
+			Node n = BlobGraphFuser.addNode(g, cur, inpgr);
+			if (!inpgr) {
+				BlobGraphFuser.setNodeRightClickHandler(n, clickHandler);
+			}
+			bton.put(cur, n);
+			ntob.put(n.getRow(), cur);
+			if (m.APB().equals(cur)) {
+				BlobGraphFuser.setNodeApb(n);
+			} else if (m.ADB().equals(cur)) {
+				BlobGraphFuser.setNodeAdb(n);
+			}
+			return n;
+		}
+
+	}
+
+	public static void addEdge(Graph g, Node n1, Blob b1, Node n2, Blob b2) {
+		if (n2 != null) {
+			BondSite bs1 = b1.boundTo(b2);
+			BondSite bs2 = b2.boundTo(b1);
+			addEdge(g, n1, b1, bs1, n2, b2, bs2);
+		}
 	}
 
 	public static void addEdge(Graph g, Node n1, Blob b1, BondSite bs1,
 			Node n2, Blob b2) {
 		if (n2 != null) {
+			BondSite bs2 = b2.boundTo(b1);
+			addEdge(g, n1, b1, bs1, n2, b2, bs2);
+		}
+
+	}
+
+	public static void addEdge(Graph g, Node n1, Blob b1, BondSite bs1,
+			Node n2, Blob b2, BondSite bs2) {
+		if (n2 != null) {
 			if (g.getEdge(n2, n1) == null) {
 				Edge e = g.addEdge(n1, n2);
 				e.set(BFConstants.EDGENUMBERSRC, bs1.ordinal());
-				BondSite bs2 = b2.boundTo(b1);
 				if (bs2 != null) {
 					e.set(BFConstants.EDGENUMBERTAR, bs2.ordinal());
 				}
@@ -142,9 +229,22 @@ public class BlobGraphFuser {
 		n.set(BFConstants.ACTION, clickHandler);
 	}
 
+	private static void stackEdge(Map<Blob, List<Blob>> edges, Blob b,
+			Blob neighbor) {
+		List<Blob> neighboredges;
+		if (edges.containsKey(neighbor)) {
+			neighboredges = edges.get(neighbor);
+		} else {
+			neighboredges = new ArrayList<Blob>();
+			edges.put(neighbor, neighboredges);
+		}
+		neighboredges.add(b);
+	}
+
 	Node root;
 
 	public void saveRoot() {
+		System.out.println("Ouch, spanning tree");
 		root = g.getSpanningTree().getRoot();
 	}
 
@@ -152,8 +252,8 @@ public class BlobGraphFuser {
 		root = r;
 	}
 
-
 	public void resetRoot() {
+		System.out.println("Ouch, spanningTree");
 		g.getSpanningTree(root);
 	}
 
@@ -181,12 +281,12 @@ public class BlobGraphFuser {
 		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
 	}
 
-	public void populateGraphFromModelAPB(Progressable p) {
+	public void populateGraphFromModelAPB(Progressable p) throws InterruptedException {
 		dfs.p = p;
 		populateGraphFromModelAPB();
 	}
 
-	public void populateGraphFromModelAPB() {
+	public void populateGraphFromModelAPB() throws InterruptedException {
 		dfs.run();
 	}
 
@@ -212,8 +312,8 @@ public class BlobGraphFuser {
 		item.setY(cur.getY() + 1);
 		item.setEndY(cur.getY() + 1);
 		item.setEndX(cur.getX() + 1);
-		System.out.println(item.getX() + " " + item.getY());
-		addEdge(g, g.getNode(n.getRow()), blob, from, newn, bn);
+		// System.out.println(item.getX() + " " + item.getY());
+		addEdge(g, g.getNode(n.getRow()), blob, newn, bn);
 		return newn;
 	}
 
