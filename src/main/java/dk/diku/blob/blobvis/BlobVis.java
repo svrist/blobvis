@@ -28,6 +28,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -77,6 +78,9 @@ import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;
 import prefuse.util.FontLib;
+import prefuse.util.display.DebugStatsPainter;
+import prefuse.util.display.ExportDisplayAction;
+import prefuse.util.display.PaintListener;
 import prefuse.util.io.SimpleFileFilter;
 import prefuse.util.ui.JValueSlider;
 import prefuse.util.ui.UILib;
@@ -301,6 +305,8 @@ public class BlobVis extends JPanel {
 		dialog.setVisible(true);
 		dialog.dispose();
 
+
+
 		return abd;
 	}
 
@@ -507,7 +513,8 @@ public class BlobVis extends JPanel {
 						 */
 						apbBsNext = BondSite.West;
 					}
-				} else if (apb.opCode().startsWith("DBS")) {
+				} else if (apb.opCode().startsWith("DBS")
+						|| apb.opCode().startsWith("SCG")) {
 					reread = true;
 				} else if (apb.opCode().startsWith("CHD")) {
 					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
@@ -659,12 +666,14 @@ public class BlobVis extends JPanel {
 			rems.addAll(gatherRemoveList(b2, n2));
 			for (Edge element : rems) {
 				Edge edge = element;
-				removeEdge(edge.getSourceNode(),edge.getTargetNode());
+				if (edge.isValid()){
+					removeEdge(edge.getSourceNode(),edge.getTargetNode(),true);
+				}
 			}
 			Edge ne = g.addEdge(n1, n2);
+
 			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
 			ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
-			// System.out.println("Added ne: " + ne);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -706,11 +715,14 @@ public class BlobVis extends JPanel {
 			thebug.set(BFConstants.EDGENUMBERSRC, 0);
 			thebug.set(BFConstants.EDGENUMBERTAR, 0);
 		}
-
 		private void removeEdge(Node n1, Node n2) {
-			// System.out.println("n1: " + n1 + " n2:" + n2);
+			removeEdge(n1,n2,false);
+		}
+
+		private void removeEdge(Node n1, Node n2,boolean keepSuperFlouous) {
+
 			Edge e1 = g.getEdge(n1, n2);
-			Edge e2 = g.getEdge(n2, n1);
+
 			if (e1 != null) {
 				/*
 				 * System.out.println("Removing " + e1 + " " +
@@ -718,6 +730,7 @@ public class BlobVis extends JPanel {
 				 */
 				g.removeEdge(e1);
 			}
+			Edge e2 = g.getEdge(n2, n1);
 			if (e2 != null) {
 				/*
 				 * System.out.println("Removing " + e2 + " " +
@@ -725,13 +738,15 @@ public class BlobVis extends JPanel {
 				 */
 				g.removeEdge(e2);
 			}
-			if (g.getDegree(n1) == 0){
-				System.out.println(n1+" went superflous. Removing");
-				g.removeNode(n1);
-			}
-			if (g.getDegree(n2) == 0){
-				System.out.println(n2+" went superflous. Removing");
-				g.removeNode(n2);
+			if (!keepSuperFlouous){
+				if (g.getDegree(n1) == 0){
+					System.out.println(n1+" went superflous. Removing");
+					g.removeNode(n1);
+				}
+				if (g.getDegree(n2) == 0){
+					System.out.println(n2+" went superflous. Removing");
+					g.removeNode(n2);
+				}
 			}
 
 
@@ -948,6 +963,8 @@ public class BlobVis extends JPanel {
 			ended = true;
 		}
 
+
+
 	}
 
 	protected void runEverything() {
@@ -1137,6 +1154,7 @@ public class BlobVis extends JPanel {
 
 		setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 		disableButtons();
+		ended = true;
 		Component c = this;
 		while (c != null && !(c instanceof JFrame)) {
 			c = c.getParent();
@@ -1194,10 +1212,8 @@ public class BlobVis extends JPanel {
 						t.cancel(true);
 						progressMonitor.close();
 						canceled = true;
-					} else if (canceled == false) {
-
+					} else if (canceled == false && ended != false) {
 						ended = false;
-
 						runEverything();
 						enableButtons();
 					}
@@ -1280,13 +1296,58 @@ public class BlobVis extends JPanel {
 			filename = OpenGraphAction.getBlobConfigFilename(frame);
 		}
 
-		BlobVis ad = new BlobVis(filename);
+		final BlobVis ad = new BlobVis(filename);
 
 		JMenuBar menubar = new JMenuBar();
 
-		JMenu dataMenu = new JMenu("Data");
+		JMenu dataMenu = new JMenu("File");
 		dataMenu.add(new OpenGraphAction(ad));
+
+		ExportDisplayAction eda = new ExportDisplayAction(ad.m_vis.getDisplay(0));
+		eda.putValue(AbstractAction.NAME, "Export Screenshot...");
+		eda.putValue(AbstractAction.ACCELERATOR_KEY, KeyStroke
+				.getKeyStroke("ctrl E"));
+		eda.putValue(AbstractAction.MNEMONIC_KEY, new Integer('E'));
+		dataMenu.add(eda);
 		menubar.add(dataMenu);
+
+		//a group of check box menu items
+		dataMenu.addSeparator();
+		JCheckBoxMenuItem cbMenuItem;
+		cbMenuItem = new JCheckBoxMenuItem("Display Debug Information");
+		cbMenuItem.setMnemonic('d');
+		cbMenuItem.setAccelerator(KeyStroke.getKeyStroke("ctrl D"));
+		cbMenuItem.addActionListener(new ActionListener() {
+			private PaintListener m_debug = null;
+
+			public void actionPerformed(ActionEvent e) {
+				if (m_debug == null) {
+					m_debug = new DebugStatsPainter();
+					ad.m_vis.getDisplay(0).addPaintListener(m_debug);
+				} else {
+					ad.m_vis.getDisplay(0).removePaintListener(m_debug);
+					m_debug = null;
+				}
+				ad.m_vis.getDisplay(0).repaint();
+			}
+		});
+		dataMenu.add(cbMenuItem);
+		dataMenu.addSeparator();
+		JMenuItem exitItem = new JMenuItem( "Exit" );
+		exitItem.setMnemonic( 'x' );
+		exitItem.addActionListener(
+				new ActionListener() {
+					public void actionPerformed( ActionEvent e )
+					{
+						System.exit( 0 );
+					}
+				}
+		);
+		dataMenu.add(exitItem);
+
+		dataMenu.setMnemonic( 'F' );
+
+
 		frame.setJMenuBar(menubar);
 		frame.setExtendedState(Frame.MAXIMIZED_HORIZ);
 		frame.getContentPane().add(ad);
@@ -1310,6 +1371,7 @@ public class BlobVis extends JPanel {
 			putValue(AbstractAction.NAME, "Open File...");
 			putValue(AbstractAction.ACCELERATOR_KEY, KeyStroke
 					.getKeyStroke("ctrl O"));
+			putValue(AbstractAction.MNEMONIC_KEY, new Integer('O'));
 		}
 
 		@Override
