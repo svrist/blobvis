@@ -43,7 +43,7 @@ public class BlobGraphFuser {
 		this.vg = vg;
 	}
 
-	private class DFSBlob {
+	private class DFSBlob implements Runnable{
 
 		boolean inpgr = true;
 		Blob start;
@@ -60,6 +60,7 @@ public class BlobGraphFuser {
 
 		public void run() {
 			dfsBlob(start);
+			saveRoot(bton.get(start));
 		}
 
 		int count = 0;
@@ -70,7 +71,6 @@ public class BlobGraphFuser {
 			 * ((nodelf.size()/(double)m.count())*100)); } count++;
 			 */
 			Blob cur = pb1;
-			System.out.println("cur:"+cur+" "+cur.opCode());
 
 			if (!bton.containsKey(cur)) {
 				Node n = BlobGraphFuser.addNode(g, cur, inpgr);
@@ -84,21 +84,17 @@ public class BlobGraphFuser {
 				} else if (m.ADB().equals(cur)) {
 					BlobGraphFuser.setNodeAdb(n);
 				}
-				if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
+				/*if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
 					// System.out.println("addEdge:"+n+"->"+nn+"(bn:"+bn+")");
 					System.out.println(cur.follow(BondSite.North) + ","
 							+ cur.follow(BondSite.East)+","
 							+ cur.follow(BondSite.South)+","
 							+ cur.follow(BondSite.West));
-				}
+				}*/
 				for (int i = 3; i >= 0; i--) {
 					BondSite bs = BondSite.create(i);
 					Blob bn = cur.follow(bs);
 					if (bn != null) {
-						if (bn.opCode().equals("EXT")){
-							System.out.println(bn);
-						}
-						//System.out.println(bn+":"+inpgr+":"+bn.opCode());
 						Node nn = null;
 						if (!bton.containsKey(bn)) {
 							if (i == 0 && inpgr) {
@@ -108,22 +104,21 @@ public class BlobGraphFuser {
 						} else if (!nodelf.contains(bn)) {
 							nn = bton.get(bn);
 						}else{
-							System.out.println("bn: "+bn+":"+bn.opCode()+"="+bton.containsKey(bn)+"-"+nodelf.contains(bn));
+							/*System.out.println("bn: "+bn+":"+bn.opCode()+"="+bton.containsKey(bn)+"-"+nodelf.contains(bn));
 							System.out.println(bn.follow(BondSite.North) + ","
 									+ bn.follow(BondSite.East)+","
 									+ bn.follow(BondSite.South)+","
-									+ bn.follow(BondSite.West));
+									+ bn.follow(BondSite.West));*/
 						}
-						if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
+						/*	if (cur.opCode().equals("EXT") || cur.opCode().equals("JB 1")) {
 							System.out.println("addEdge:" + n + "->" + nn
 									+ "(bn:" + bn + ")");
-						}
+						}*/
 						BlobGraphFuser.addEdge(g, n, cur, bs, nn, bn);
 					}
 				}
 				nodelf.add(cur);
 			}
-			System.out.println("cur============"+cur.opCode());
 			return bton.get(cur);
 		}
 
@@ -152,6 +147,11 @@ public class BlobGraphFuser {
 	public void saveRoot() {
 		root = g.getSpanningTree().getRoot();
 	}
+
+	public void saveRoot(Node r) {
+		root = r;
+	}
+
 
 	public void resetRoot() {
 		g.getSpanningTree(root);
@@ -207,7 +207,6 @@ public class BlobGraphFuser {
 		ntob.put(newn.getRow(), bn);
 
 		VisualItem cur = (VisualItem) vg.getNode(n.getRow());
-		System.out.println(cur.getX() + " " + cur.getY());
 		VisualItem item = (VisualItem) vg.getNode(newn.getRow());
 		item.setX(cur.getX() + 1);
 		item.setY(cur.getY() + 1);
@@ -232,6 +231,10 @@ public class BlobGraphFuser {
 			}
 		}
 		g.removeNode(vi.getRow());
+	}
+
+	public Node getRoot() {
+		return root;
 	}
 
 }

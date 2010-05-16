@@ -488,7 +488,7 @@ public class BlobVis extends JPanel {
 					return;
 				}
 
-				Node r = g.getSpanningTree().getRoot();
+				Node r = bgf.getRoot();
 				Blob apb = (Blob) r.get(BFConstants.BLOBFIELD);
 				Blob adb = apb.follow(BondSite.North);
 				BondSite apbBsNext = BondSite.South;
@@ -732,7 +732,7 @@ public class BlobVis extends JPanel {
 			if (nn != null) {
 				VisualItem vnn = (VisualItem) vg.getNode(nn.getRow());
 				nn.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
-				g.getSpanningTree(nn);
+				bgf.saveRoot(nn);
 				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
 				m.step();
 			} else {
