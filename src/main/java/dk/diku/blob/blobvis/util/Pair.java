@@ -1,4 +1,4 @@
-package dk.diku.blob.blobvis;
+package dk.diku.blob.blobvis.util;
 
 public class Pair<T1, T2> {
 	public Pair(T1 one, T2 two) {
@@ -13,6 +13,7 @@ public class Pair<T1, T2> {
 		result = prime * result + ((two == null) ? 0 : two.hashCode());
 		return result;
 	}
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -21,7 +22,7 @@ public class Pair<T1, T2> {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		Pair other = (Pair) obj;
+		Pair<T1,T2> other = (Pair<T1,T2>) obj;
 		if (one == null) {
 			if (other.one != null)
 				return false;
@@ -34,8 +35,20 @@ public class Pair<T1, T2> {
 			return false;
 		return true;
 	}
-	T1 one;
-	T2 two;
+	public T1 one;
+	public T2 two;
+	public T1 getOne() {
+		return one;
+	}
+	public void setOne(T1 one) {
+		this.one = one;
+	}
+	public T2 getTwo() {
+		return two;
+	}
+	public void setTwo(T2 two) {
+		this.two = two;
+	}
 
 
 }

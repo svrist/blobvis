@@ -1,7 +1,8 @@
-package dk.diku.blob.blobvis;
+package dk.diku.blob.blobvis.prefuse;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -9,14 +10,14 @@ import java.util.Stack;
 import model.Blob;
 import model.BondSite;
 import model.Model;
-import prefuse.controls.Control;
-import prefuse.controls.ControlAdapter;
 import prefuse.data.Edge;
 import prefuse.data.Graph;
 import prefuse.data.Node;
 import prefuse.data.Tuple;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
+import dk.diku.blob.blobvis.gui.Progressable;
+import dk.diku.blob.blobvis.util.Pair;
 
 public class BlobGraphFuser {
 
@@ -28,16 +29,14 @@ public class BlobGraphFuser {
 	private Map<Integer, Blob> ntob;
 	private List<Blob> nodelf;
 
-	Control clickHandler;
 	private DFSBlob dfs;
 
-	public BlobGraphFuser(Graph g, Model m, ControlAdapter clickHandler) {
+	public BlobGraphFuser(Graph g, Model m) {
 		this.g = g;
 		this.m = m;
 		bton = new HashMap<Blob, Node>();
 		ntob = new HashMap<Integer, Blob>();
 		dfs = new DFSBlob(m.APB());
-		this.clickHandler = clickHandler;
 	}
 
 	public void setVisualGraph(VisualGraph vg) {
@@ -66,43 +65,9 @@ public class BlobGraphFuser {
 
 		int count = 0;
 
-		class BlobStackEntry {
-			@Override
-			public int hashCode() {
-				return b.hashCode();
-			}
-			@Override
-			public boolean equals(Object obj) {
-				if (this == obj)
-					return true;
-				if (obj == null)
-					return false;
-				if (getClass() == obj.getClass()){
-					BlobStackEntry other = (BlobStackEntry) obj;
-					if (b == null) {
-						if (other.b != null)
-							return false;
-					} else if (!b.equals(other.b))
-						return false;
-					return true;
-				}else if (obj.getClass()==b.getClass()){
-					return b.equals(obj);
-				}else{
-					return false;
-				}
-			}
-			Blob b;
-			boolean inPgr;
-			public BlobStackEntry(Blob b, boolean inPgr) {
-				super();
-				this.b = b;
-				this.inPgr = inPgr;
-			}
-			private DFSBlob getOuterType() {
-				return DFSBlob.this;
-			}
 
-		}
+
+
 
 		private void it_dfsBlob(Blob start) throws InterruptedException {
 			Stack<Pair<Blob,Boolean>> nextStack = new Stack<Pair<Blob,Boolean>>();
@@ -110,7 +75,7 @@ public class BlobGraphFuser {
 			Map<Blob, List<Blob>> edges = new HashMap<Blob, List<Blob>>();
 
 			// Enqueue root
-			nextStack.add(new Pair(start,true));
+			nextStack.add(new Pair<Blob,Boolean>(start,true));
 			double mcount = m.count();
 
 			while (!nextStack.isEmpty()) {
@@ -230,9 +195,7 @@ public class BlobGraphFuser {
 
 		private Node addBlobAsNode(Blob cur,boolean inPgr) {
 			Node n = BlobGraphFuser.addNode(g, cur, inPgr);
-			if (!inPgr) {
-				BlobGraphFuser.setNodeRightClickHandler(n, clickHandler);
-			}
+
 			bton.put(cur, n);
 			ntob.put(n.getRow(), cur);
 			if (m.APB().equals(cur)) {
@@ -275,9 +238,7 @@ public class BlobGraphFuser {
 		}
 	}
 
-	static void setNodeRightClickHandler(Node n, Control clickHandler) {
-		n.set(BFConstants.ACTION, clickHandler);
-	}
+
 
 	private static void stackEdge(Map<Blob, List<Blob>> edges, Blob b,
 			Blob neighbor) {
@@ -294,8 +255,8 @@ public class BlobGraphFuser {
 	Node root;
 
 	public void saveRoot() {
-		System.out.println("Ouch, spanning tree");
-		root = g.getSpanningTree().getRoot();
+		/*System.out.println("Ouch, spanning tree");
+		root = g.getSpanningTree().getRoot();*/
 	}
 
 	public void saveRoot(Node r) {
@@ -303,8 +264,8 @@ public class BlobGraphFuser {
 	}
 
 	public void resetRoot() {
-		System.out.println("Ouch, spanningTree");
-		g.getSpanningTree(root);
+		/*System.out.println("Ouch, spanningTree");
+		g.getSpanningTree(root);*/
 	}
 
 	public static Node addNode(Graph g, Blob b, boolean inPgr) {
@@ -342,9 +303,9 @@ public class BlobGraphFuser {
 
 	public void addDataBlobToBondSite(VisualItem item, BondSite from,
 			BondSite to, int cargo) {
-		Node n = addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
+		addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
 				false, cargo);
-		BlobGraphFuser.setNodeRightClickHandler(n, clickHandler);
+
 	}
 
 	private Node addBlobToBondSite(Tuple n, Blob blob, BondSite from,
@@ -395,6 +356,83 @@ public class BlobGraphFuser {
 		}else{
 			n.setString(BFConstants.LABEL,b.getCargo()+"");
 		}
+	}
+
+	public Node getNode(Blob b) {
+		return bton.get(b);
+	}
+
+	public void removeEdge(Node n1, Node n2) {
+		removeEdge(n1,n2,false);
+	}
+
+	public void removeEdge(Node n1, Node n2,boolean keepSuperFlouous) {
+
+		Edge e1 = g.getEdge(n1, n2);
+
+		if (e1 != null) {
+			/*
+			 * System.out.println("Removing " + e1 + " " +
+			 * e1.getSourceNode() + "->" + e1.getTargetNode());
+			 */
+			g.removeEdge(e1);
+		}
+		Edge e2 = g.getEdge(n2, n1);
+		if (e2 != null) {
+			/*
+			 * System.out.println("Removing " + e2 + " " +
+			 * e2.getSourceNode() + "->" + e2.getTargetNode());
+			 */
+			g.removeEdge(e2);
+		}
+		if (!keepSuperFlouous){
+			if (g.getDegree(n1) == 0){
+				System.out.println(n1+" went superflous. Removing");
+				g.removeNode(n1);
+			}
+			if (g.getDegree(n2) == 0){
+				System.out.println(n2+" went superflous. Removing");
+				g.removeNode(n2);
+			}
+		}
+
+
+	}
+
+	public void linkNodes(Node n1, BondSite b1, Node n2, BondSite b2) {
+		// loop over adb/dest edges.
+		// Remove all with src/tar of b1/ds
+		// link adb with dest. Set src=b1, tar=ds
+		// System.out.println("Adb: " + n1);
+		List<Edge> rems = gatherRemoveList(b1, n1);
+		// System.out.println("dstn: " + n2);
+		rems.addAll(gatherRemoveList(b2, n2));
+		for (Edge element : rems) {
+			Edge edge = element;
+			if (edge.isValid()){
+				removeEdge(edge.getSourceNode(),edge.getTargetNode(),true);
+			}
+		}
+		Edge ne = g.addEdge(n1, n2);
+
+		ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
+		ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<Edge> gatherRemoveList(BondSite needle, Node n) {
+		List<Edge> rems = new ArrayList<Edge>();
+		Iterator removeIterator = n.edges();
+		while (removeIterator.hasNext()) {
+			Edge ce = (Edge) removeIterator.next();
+			String field = ce.getSourceNode() == n ? BFConstants.EDGENUMBERSRC
+					: BFConstants.EDGENUMBERTAR;
+			int bsi = (Integer) ce.get(field);
+			if (bsi == needle.ordinal()) {
+				rems.add(ce);
+			}
+		}
+		return rems;
 	}
 
 }

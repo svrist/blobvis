@@ -1,4 +1,4 @@
-package dk.diku.blob.blobvis;
+package dk.diku.blob.blobvis.prefuse;
 
 import java.awt.geom.Rectangle2D;
 import java.util.Iterator;

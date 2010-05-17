@@ -1,4 +1,4 @@
-package dk.diku.blob.blobvis;
+package dk.diku.blob.blobvis.prefuse;
 
 import java.awt.Cursor;
 import java.awt.event.MouseEvent;
@@ -13,7 +13,7 @@ import prefuse.visual.VisualItem;
 /**
  * Interactive drag control that is "aggregate-aware"
  */
-class BlobDragControl extends ControlAdapter {
+public class BlobDragControl extends ControlAdapter {
 
 	private VisualItem activeItem;
 	protected Point2D down = new Point2D.Double();

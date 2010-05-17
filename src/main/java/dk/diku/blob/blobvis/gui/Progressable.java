@@ -1,4 +1,4 @@
-package dk.diku.blob.blobvis;
+package dk.diku.blob.blobvis.gui;
 
 public interface Progressable {
 
