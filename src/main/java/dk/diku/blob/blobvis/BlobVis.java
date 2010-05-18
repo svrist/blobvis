@@ -51,7 +51,6 @@ import prefuse.action.layout.graph.RadialTreeLayout;
 import prefuse.controls.ControlAdapter;
 import prefuse.controls.PanControl;
 import prefuse.controls.WheelZoomControl;
-import prefuse.data.Edge;
 import prefuse.data.Graph;
 import prefuse.data.Node;
 import prefuse.render.DefaultRendererFactory;
@@ -70,7 +69,8 @@ import dk.diku.blob.blobvis.gui.OpenGraphAction;
 import dk.diku.blob.blobvis.prefuse.BFConstants;
 import dk.diku.blob.blobvis.prefuse.BlobDragControl;
 import dk.diku.blob.blobvis.prefuse.BlobEdgeRenderer;
-import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
+import dk.diku.blob.blobvis.prefuse.BlobGraphModel;
+import dk.diku.blob.blobvis.prefuse.StepResult;
 
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
@@ -78,7 +78,6 @@ public class BlobVis extends JPanel {
 
 	// The file currently open. For restarting.
 	private String currentFile = null;
-
 
 	// Constants for prefuse.
 	private static final String GRAPH = "graph";
@@ -102,7 +101,7 @@ public class BlobVis extends JPanel {
 	private Model m;
 
 	// Bonding between Prefuse graph and blob simulator model.
-	private BlobGraphFuser bgf;
+	private BlobGraphModel bgf;
 
 	// Swing components
 	private ProgressMonitor progressMonitor;
@@ -123,7 +122,8 @@ public class BlobVis extends JPanel {
 				tmpStopForce();
 				boolean inpgr = (Boolean) item.get(BFConstants.BLOBINPGR);
 				if (!inpgr) { // only show menu for data blobs
-					DataBlobPopupMenu menu = new DataBlobPopupMenu( BlobVis.this,bgf,item);
+					DataBlobPopupMenu menu = new DataBlobPopupMenu(
+							BlobVis.this, bgf, item);
 					menu.addFocusListener(new FocusListener() {
 						@Override
 						public void focusLost(FocusEvent e) {
@@ -157,154 +157,71 @@ public class BlobVis extends JPanel {
 		public void actionPerformed(ActionEvent e) {
 
 			tmpRunForce1s();
+
+
+			bgf.registerOpcodeListener("EXT", new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent arg0) {
+					ended = true;
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					step.setEnabled(false);
+					tmpStopForce();
+				}
+			});
+			bgf.registerStepListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					StepResult sr = (StepResult) e.getSource();
+					VisualItem vnn = (VisualItem) vg.getNode(bgf.getNode(sr.apbnext).getRow());
+					m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
+				}
+			});
+
+
+
 			synchronized (m_vis) {
 				if (ended) {
 					System.out.println("At EXT. Done");
 					return;
 				}
-
-				Node r = bgf.getRoot();
-				boolean reread = false;
+				bgf.step();
+				return;
+				/*Node r = bgf.getRoot();
 				Blob apb = (Blob) r.get(BFConstants.BLOBFIELD);
 				Blob adb = apb.follow(BondSite.North);
-				BondSite apbBsNext = BondSite.South;
+				StepResult result;
 
-				Node adbn = bgf.getNode(adb);
-				Node adbnnext = bgf.getNode(adb);
 
-				r.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_INPGR);
 				if (apb.opCode().startsWith("JB")) {
-					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-					if (m.ADB().follow(b) != null) {
-						apbBsNext = BondSite.South;
-						/* System.out.println("Going south"); */
-					} else {
-						/*
-						 * System.out.println("Nothing on " + m.ADB() + "." + b
-						 * + " going west(" + m.ADB().follow(BondSite.East) +
-						 * m.ADB().follow(BondSite.South) +
-						 * m.ADB().follow(BondSite.West) + ") - " + adb);
-						 */
-						apbBsNext = BondSite.West;
-					}
+					result = doJB(apb, adb);
 				} else if (apb.opCode().startsWith("DBS")
 						|| apb.opCode().startsWith("SCG")) {
-					reread = true;
+					result = new StepResult(apb, adb).reread(true);
 				} else if (apb.opCode().startsWith("CHD")) {
-					BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-					adb = m.ADB().follow(b);
-					// g.removeEdge(g.getEdge)
-					adbnnext = bgf.getNode(adb);
-
-				} else if (apb.opCode().startsWith("JCG")){
-					int c = ( 4 + 2 + 1 ) & apb.getCargo();
-					if (adb.getCargo(c)){
-						apbBsNext = BondSite.South;
-					}else{
-						apbBsNext = BondSite.West;
-					}
-
+					result = doCHD(apb, adb);
+				} else if (apb.opCode().startsWith("JCG")) {
+					result = doJCG(apb, adb);
 				} else if (apb.opCode().startsWith("SBS")) {
-					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
-					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
-					Blob bb1 = adb.follow(b1);
-					Blob bb2 = adb.follow(b2);
-					if (bb1 != null) {
-						setSrcBondSite(adbn, bb1, b2);
-					}
-					if (bb2 != null) {
-						setSrcBondSite(adbn, bb2, b1);
-					}
+					result = doSBS(apb, adb);
 
 				} else if (apb.opCode().startsWith("JN")) {
-					BondSite b1 = BondSite
-					.create(((8 + 4) & apb.getCargo()) / 4);
-					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
-
-					Blob dest1 = adb.follow(b1);
-					Blob dest = dest1.follow(b2);
-					Node destn = bgf.getNode(dest);
-					if (dest != null) {
-						BondSite ds = dest.boundTo(dest1);
-						bgf.linkNodes(adbn, b1, destn, ds);
-					} else {
-						Node n = bgf.getNode(dest1);
-						System.out.println("Removing "+adbn+"->"+n);
-						bgf.removeEdge(adbn,n);
-
-					}
+					result = doJN(apb, adb);
 				} else if (apb.opCode().startsWith("SWL")) {
-					BondSite b1 = BondSite
-					.create(((8 + 4) & m.APB().getCargo()) / 4);
-					BondSite b2 = BondSite.create((2 + 1) & m.APB().getCargo());
-
-					Blob adb_b1 = m.ADB().follow(b1);
-					Node adb_b1n = null;
-					BondSite ts2 = null;
-					if (adb_b1 != null) {
-						ts2 = adb_b1.boundTo(m.ADB());
-						adb_b1n = bgf.getNode(adb_b1);
-					}
-					Blob adb_b2 = m.ADB().follow(b2);
-					Blob adb_b2_b1 = null;
-					if (adb_b2 != null) {
-						adb_b2_b1 = adb_b2.follow(b1);
-						Node adb_b2n = bgf.getNode(adb_b2);
-						if (adb_b2_b1 != null) {
-							BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
-							// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
-							Node adb_b2_b1n = bgf.getNode(adb_b2_b1);
-							bgf.linkNodes(adbn, b1, adb_b2_b1n, ts1);
-
-							if (adb_b1 != null) {
-								// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
-								bgf.linkNodes(adb_b2n, b1, adb_b1n, ts2);
-								// case 4: something(x) on b1 and something(y)
-								// on
-								// b2.b1 -> b1=y, b2.b1=x
-							} else {
-
-								// Case 2: Nothing on b1 and something(x) on
-								// b2.b1
-								// -> b2.b1=null,b1=x
-								// TODO: adb_b2.unlink( b1 );
-								bgf.removeEdge(adb_b2n, adb_b2_b1n);
-
-							}
-						} else if (adb_b1 != null) {
-							// case 3: Something(x) on b1 and nothing on b2.b1
-							// ->
-							// b2.b1=x,b1=nothing
-							// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
-							bgf.linkNodes(adb_b2n, b1, adb_b1n, ts2);
-							// TODO: ADB.unlink( b1 );
-							bgf.removeEdge(adbn, adb_b1n);
-						} else {
-							/* System.out.println("Case 6"); */
-							// case 6: Nothing on b1 and nothing on b2.b1 ->
-							// nothing
-							// happens
-						}
-					} else if (adb_b1 != null) {
-						// case 5: something(x) on b1 and nothing on b2 ->
-						// b1=null,
-						// x disappers
-						// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
-						bgf.removeEdge(adbn, adb_b1n);
-					} else {
-						// Case 1: Nothing on b1 and nothing on b2 -> nothing
-						// happens
-					}
+					result = doSWL(apb, adb);
 				} else {
-					apbBsNext = BondSite.South;
+					result = new StepResult(apb, adb); // Default action
 				}
+				bgm.execute(result);
 
-				Blob next = apb.follow(apbBsNext);
+				/*				Blob next = apb.follow(apbBsNext);
 				Node nn = bgf.getNode(next);
-				updateTheBug(r, nn, adbn, adbnnext);
+				bgf.updateTheBug(r, nn, adbn, adbnnext);
 				stepModel(r, nn);
-				if (reread){
+				if (reread) {
 					bgf.rereadCargo(m.ADB());
 				}
 
@@ -317,56 +234,143 @@ public class BlobVis extends JPanel {
 					}
 					step.setEnabled(false);
 					tmpStopForce();
-				}
-
+				}*/
 
 			}
+		}
+
+		private StepResult doSWL(Blob apb, Blob adb) {
+			StepResult result;
+			BondSite b1 = BondSite
+			.create(((8 + 4) & apb.getCargo()) / 4);
+			BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+			result = new StepResult(apb, adb);
+
+			Blob adb_b1 = adb.follow(b1);
+			Node adb_b1n = null;
+			BondSite ts2 = null;
+			if (adb_b1 != null) {
+				ts2 = adb_b1.boundTo(adb);
+				adb_b1n = bgf.getNode(adb_b1);
+			}
+			Blob adb_b2 = adb.follow(b2);
+			Blob adb_b2_b1 = null;
+			if (adb_b2 != null) {
+				adb_b2_b1 = adb_b2.follow(b1);
+				Node adb_b2n = bgf.getNode(adb_b2);
+				if (adb_b2_b1 != null) {
+					BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
+					// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
+					Node adb_b2_b1n = bgf.getNode(adb_b2_b1);
+					bgf.linkNodes(bgf.getNode(adb), b1, adb_b2_b1n, ts1);
+					if (adb_b1 != null) {
+						// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
+						bgf.linkNodes(adb_b2n, b1, adb_b1n, ts2);
+						// case 4: something(x) on b1 and something(y)
+						// on
+						// b2.b1 -> b1=y, b2.b1=x
+					} else {
+
+						// Case 2: Nothing on b1 and something(x) on
+						// b2.b1
+						// -> b2.b1=null,b1=x
+						// TODO: adb_b2.unlink( b1 );
+						bgf.removeEdge(adb_b2n, adb_b2_b1n);
+					}
+				} else if (adb_b1 != null) {
+					// case 3: Something(x) on b1 and nothing on b2.b1
+					// ->
+					// b2.b1=x,b1=nothing
+					// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
+					bgf.linkNodes(adb_b2n, b1, adb_b1n, ts2);
+					// TODO: ADB.unlink( b1 );
+					bgf.removeEdge(bgf.getNode(adb), adb_b1n);
+				} else {
+					/* System.out.println("Case 6"); */
+					// case 6: Nothing on b1 and nothing on b2.b1 ->
+					// nothing
+					// happens
+				}
+			} else if (adb_b1 != null) {
+				// case 5: something(x) on b1 and nothing on b2 ->
+				// b1=null,
+				// x disappers
+				// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
+				bgf.removeEdge(bgf.getNode(adb), adb_b1n);
+			} else {
+				// Case 1: Nothing on b1 and nothing on b2 -> nothing
+				// happens
+			}
+			return result;
+		}
+
+		private StepResult doJN(Blob apb, Blob adb) {
+			StepResult result;
+			BondSite b1 = BondSite
+			.create(((8 + 4) & apb.getCargo()) / 4);
+			BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+
+			Blob dest1 = adb.follow(b1);
+			Blob dest = dest1.follow(b2);
+			Node destn = bgf.getNode(dest);
+			if (dest != null) {
+				BondSite ds = dest.boundTo(dest1);
+				bgf.linkNodes(bgf.getNode(adb), b1, destn, ds);
+			} else {
+				Node n = bgf.getNode(dest1);
+				bgf.removeEdge(bgf.getNode(adb), n);
+			}
+			result = new StepResult(apb, adb);
+			return result;
+		}
+
+		private StepResult doSBS(Blob apb, Blob adb) {
+			StepResult result;
+			BondSite b1 = BondSite
+			.create(((8 + 4) & apb.getCargo()) / 4);
+			BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+			Blob bb1 = adb.follow(b1);
+			Blob bb2 = adb.follow(b2);
+			if (bb1 != null) {
+				bgf.setSrcBondSite(bgf.getNode(adb), bb1, b2);
+			}
+			if (bb2 != null) {
+				bgf.setSrcBondSite(bgf.getNode(adb), bb2, b1);
+			}
+			result = new StepResult(apb, adb);
+			return result;
+		}
+
+		private StepResult doJCG(Blob apb, Blob adb) {
+			StepResult result;
+			int c = (4 + 2 + 1) & apb.getCargo();
+			result = new StepResult(apb, adb);
+			if (!adb.getCargo(c)) {
+				result.apbNext(BondSite.West);
+			}
+			return result;
+		}
+
+		private StepResult doCHD(Blob apb, Blob adb) {
+			StepResult result;
+			BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+			result = new StepResult(apb, adb).adbNext(b);
+			return result;
+		}
+
+		private StepResult doJB(Blob apb, Blob adb) {
+			StepResult result;
+			result = new StepResult(apb, adb).reread(false);
+			BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+			result.apbNext(apb.follow(m.ADB().follow(b) == null ? BondSite.West
+					: BondSite.South));
+			return result;
 		}
 
 		private void tmpRunForce1s() {
-			if (paused){
+			if (paused) {
 				m_vis.cancel("1sforce");
 				m_vis.run("1sforce");
-			}
-		}
-
-
-
-		private void setSrcBondSite(Node srcn, Blob target, BondSite newvalue) {
-			Node bbn1 = bgf.getNode(target);
-			Edge e1 = g.getEdge(srcn, bbn1);
-			if (e1 != null) {
-				e1.set(BFConstants.EDGENUMBERSRC, newvalue.ordinal());
-			} else {
-				e1 = g.getEdge(bbn1, srcn);
-				e1.set(BFConstants.EDGENUMBERTAR, newvalue.ordinal());
-			}
-
-		}
-
-		private void updateTheBug(Node r, Node nn, Node adbncur, Node adbnnext) {
-
-			Edge thebug = g.addEdge(nn, adbnnext);
-			bgf.removeEdge(r, adbncur);
-			adbncur.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
-			adbnnext.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_ADB);
-			/* System.out.println(nn + " -> " + adbnnext); */
-
-			thebug.set(BFConstants.EDGENUMBERSRC, 0);
-			thebug.set(BFConstants.EDGENUMBERTAR, 0);
-		}
-
-
-		private void stepModel(Node r, Node nn) {
-
-			if (nn != null) {
-				VisualItem vnn = (VisualItem) vg.getNode(nn.getRow());
-				nn.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
-				bgf.saveRoot(nn);
-				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
-				m.step();
-			} else {
-				throw new RuntimeException("Failed to find the child successor");
 			}
 		}
 
@@ -379,7 +383,7 @@ public class BlobVis extends JPanel {
 		super(new BorderLayout());
 
 		m_vis = new Visualization();
-		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS,hops);
+		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
 		// init base components.
 		setupRenderer();
 		setupActions();
@@ -393,7 +397,7 @@ public class BlobVis extends JPanel {
 
 		Box boxpanel = setupBoxpanel();
 		panel.add(boxpanel);
-		JSplitPane split = setupSplitPane(display,panel);
+		JSplitPane split = setupSplitPane(display, panel);
 		add(split);
 		ended = true;
 		disableButtons();
@@ -401,8 +405,8 @@ public class BlobVis extends JPanel {
 	}
 
 	private void readData(String filename) {
-		if (filename == null|| "".equals(filename)){
-			filename = OpenGraphAction.getBlobConfigFilename(this,prefs);
+		if (filename == null || "".equals(filename)) {
+			filename = OpenGraphAction.getBlobConfigFilename(this, prefs);
 		}
 		if (filename != null) {
 			readProgramAndDataAsGraph(filename);
@@ -433,7 +437,6 @@ public class BlobVis extends JPanel {
 		split.setDividerLocation(-1);
 		return split;
 	}
-
 
 	private Box setupSlider() {
 		slider.addChangeListener(new ChangeListener() {
@@ -490,7 +493,7 @@ public class BlobVis extends JPanel {
 		display.setSize(800, 800);
 		display.pan(150, 150);
 		display.setHighQuality(true);
-		//display.setItemSorter(new TreeDepthItemSorter());
+		// display.setItemSorter(new TreeDepthItemSorter());
 
 		display.addControlListener(new BlobDragControl());
 		display.addControlListener(new PanControl());
@@ -513,7 +516,7 @@ public class BlobVis extends JPanel {
 		init.add(filter);
 		init.add(getColorSetup());
 		init.add(new RadialTreeLayout(GRAPH));
-		//init.add(new RandomLayout());
+		// init.add(new RandomLayout());
 		init.add(new RepaintAction());
 
 		ActionList singleforce = new ActionList(1000);
@@ -528,7 +531,6 @@ public class BlobVis extends JPanel {
 		basePaused.add(getColorSetup()); // base.add(new AggregateLayout(AGGR));
 		basePaused.add(new RepaintAction());
 		m_vis.putAction("basepaused", basePaused);
-
 
 		ActionList pausedActions = new ActionList(500);
 		pausedActions.add(new VisibilityAnimator());
@@ -569,7 +571,6 @@ public class BlobVis extends JPanel {
 		paused = false;
 	}
 
-
 	/**
 	 * Stop force simulation, temporarily. Keep current state
 	 */
@@ -583,7 +584,7 @@ public class BlobVis extends JPanel {
 	private void tmpRestartForce() {
 		if (!paused) {
 			m_vis.run("force");
-		}else{
+		} else {
 			m_vis.cancel("force");
 		}
 	}
@@ -603,8 +604,6 @@ public class BlobVis extends JPanel {
 		}
 	}
 
-
-
 	private ActionList getColorSetup() {
 
 		// set up the visual operators
@@ -622,8 +621,8 @@ public class BlobVis extends JPanel {
 
 		ColorAction nEdges = new ColorAction(EDGES, VisualItem.STROKECOLOR);
 		nEdges.setDefaultColor(ColorLib.gray(100));
-		ColorAction nEdgesText = new ColorAction(EDGES,
-				VisualItem.TEXTCOLOR, ColorLib.gray(0));
+		ColorAction nEdgesText = new ColorAction(EDGES, VisualItem.TEXTCOLOR,
+				ColorLib.gray(0));
 
 		ColorAction nText = new ColorAction(NODES, VisualItem.TEXTCOLOR,
 				ColorLib.rgb(0, 0, 0));
@@ -640,9 +639,8 @@ public class BlobVis extends JPanel {
 				ColorLib.rgba(255, 110, 110, 210), // data 2
 				ColorLib.rgba(200, 255, 200, 210), // inpgr 3
 		};
-		ColorAction nFillAdb = new DataColorAction(NODES,
-				BFConstants.BLOBTYPE, Constants.NOMINAL,
-				VisualItem.FILLCOLOR, palette);
+		ColorAction nFillAdb = new DataColorAction(NODES, BFConstants.BLOBTYPE,
+				Constants.NOMINAL, VisualItem.FILLCOLOR, palette);
 
 		// bundle the color actions
 
@@ -671,12 +669,12 @@ public class BlobVis extends JPanel {
 		return vg;
 	}
 
-
-
 	/**
-	 * Start loading the data from the filename in a background task
-	 * When done the progress monitor will close and buttons will be activated.
-	 * @param filename Blob configuration filename
+	 * Start loading the data from the filename in a background task When done
+	 * the progress monitor will close and buttons will be activated.
+	 * 
+	 * @param filename
+	 *            Blob configuration filename
 	 */
 	public void readProgramAndDataAsGraph(final String filename) {
 		setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
@@ -687,16 +685,18 @@ public class BlobVis extends JPanel {
 			c = c.getParent();
 		}
 		progressMonitor = new ProgressMonitor(c,
-				"Loading Blob configuration from "+filename+"...", "", 0, 100);
+				"Loading Blob configuration from " + filename + "...", "", 0,
+				100);
 		progressMonitor.setProgress(0);
 
 		// Create empy models and graphs.
 		g = new Graph();
 		m = new Model();
-		final ReadBlobConfigTask t = new ReadBlobConfigTask(g,m,filename);
+		final ReadBlobConfigTask t = new ReadBlobConfigTask(g, m, filename);
 
 		t.addPropertyChangeListener(new PropertyChangeListener() {
 			boolean canceled = false;
+
 			@Override
 			public void propertyChange(PropertyChangeEvent evt) {
 				if ("progress" == evt.getPropertyName()) {
@@ -745,20 +745,17 @@ public class BlobVis extends JPanel {
 		slider.setEnabled(true);
 	}
 
-
-
 	public static void main(String[] argv) {
 
 		// provide a final pointer to the filename while still being able to
 		// change the value dynamically.
 		final String[] filename = new String[1];
 
-		//Load preferences.
+		// Load preferences.
 		prefs = Preferences.userNodeForPackage(BlobVis.class);
 		if (argv.length > 0) {
 			filename[0] = argv[0];
 		}
-
 
 		// filename is a final pointer to an array with one value.
 		// When including in nested classes it must be final.
@@ -799,17 +796,17 @@ public class BlobVis extends JPanel {
 
 	private static JMenu setupFileMenu(final BlobVis ad) {
 		JMenu fileMenu = new JMenu("File");
-		fileMenu.add(new OpenGraphAction(ad,prefs));
+		fileMenu.add(new OpenGraphAction(ad, prefs));
 
-		ExportDisplayAction eda = new ExportDisplayAction(ad.m_vis.getDisplay(0));
+		ExportDisplayAction eda = new ExportDisplayAction(ad.m_vis
+				.getDisplay(0));
 		eda.putValue(AbstractAction.NAME, "Export Screenshot...");
 		eda.putValue(AbstractAction.ACCELERATOR_KEY, KeyStroke
 				.getKeyStroke("ctrl E"));
 		eda.putValue(AbstractAction.MNEMONIC_KEY, new Integer('E'));
 		fileMenu.add(eda);
 
-
-		//a group of check box menu items
+		// a group of check box menu items
 		fileMenu.addSeparator();
 		JCheckBoxMenuItem cbMenuItem;
 		cbMenuItem = new JCheckBoxMenuItem("Display Debug Information");
@@ -831,18 +828,15 @@ public class BlobVis extends JPanel {
 		});
 		fileMenu.add(cbMenuItem);
 		fileMenu.addSeparator();
-		JMenuItem exitItem = new JMenuItem( "Exit" );
-		exitItem.setMnemonic( 'x' );
-		exitItem.addActionListener(
-				new ActionListener() {
-					public void actionPerformed( ActionEvent e )
-					{
-						System.exit( 0 );
-					}
-				}
-		);
+		JMenuItem exitItem = new JMenuItem("Exit");
+		exitItem.setMnemonic('x');
+		exitItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				System.exit(0);
+			}
+		});
 		fileMenu.add(exitItem);
-		fileMenu.setMnemonic( 'F' );
+		fileMenu.setMnemonic('F');
 		return fileMenu;
 	}
 }

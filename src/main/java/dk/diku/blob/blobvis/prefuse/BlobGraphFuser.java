@@ -292,6 +292,21 @@ public class BlobGraphFuser {
 		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
 	}
 
+	public static void setNodeInPgr(Node n) {
+		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_INPGR);
+	}
+
+	public void setSrcBondSite(Node srcn, Blob target, BondSite newvalue) {
+		Node bbn1 = getNode(target);
+		Edge e1 = g.getEdge(srcn, bbn1);
+		if (e1 != null) {
+			e1.set(BFConstants.EDGENUMBERSRC, newvalue.ordinal());
+		} else {
+			e1 = g.getEdge(bbn1, srcn);
+			e1.set(BFConstants.EDGENUMBERTAR, newvalue.ordinal());
+		}
+	}
+
 	public void populateGraphFromModelAPB(Progressable p) throws InterruptedException {
 		dfs.p = p;
 		populateGraphFromModelAPB();
@@ -433,6 +448,46 @@ public class BlobGraphFuser {
 			}
 		}
 		return rems;
+	}
+
+	public void updateTheBug(Node r, Node nn, Node adbncur, Node adbnnext) {
+		Edge thebug = g.addEdge(nn, adbnnext);
+		removeEdge(r, adbncur);
+		adbncur.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
+		adbnnext.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_ADB);
+		/* System.out.println(nn + " -> " + adbnnext); */
+		thebug.set(BFConstants.EDGENUMBERSRC, 0);
+		thebug.set(BFConstants.EDGENUMBERTAR, 0);
+	}
+
+	public void stepModel(Node node, Node nn) {
+		if (nn != null) {
+			nn.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
+			saveRoot(nn);
+			m.step();
+		} else {
+			throw new RuntimeException("Failed to find the child successor");
+		}
+
+	}
+
+	public Blob APB() {
+		return m.APB();
+	}
+	public Blob ADB() {
+		return m.ADB();
+	}
+
+	public void execute(StepResult sr){
+		sr.testValid();
+		setNodeInPgr(getRoot());
+		Node nn = getNode(sr.apbnext);
+		updateTheBug(getNode(sr.apbcur), nn, getNode(sr.adbcur),
+				getNode(sr.adbnext));
+		stepModel(getNode(sr.apbcur), nn);
+		if (sr.reread_cargo){
+			rereadCargo(sr.adbnext);
+		}
 	}
 
 }

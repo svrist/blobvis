@@ -6,14 +6,14 @@ package dk.diku.blob.blobvis;
 import model.Model;
 import prefuse.data.Graph;
 import dk.diku.blob.blobvis.prefuse.BFConstants;
-import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
+import dk.diku.blob.blobvis.prefuse.BlobGraphModel;
 import dk.diku.blob.blobvis.util.Task;
 
 final class ReadBlobConfigTask extends Task {
 	private final String filename;
 	Graph g;
 	Model m;
-	BlobGraphFuser bgf;
+	BlobGraphModel bgf;
 
 	ReadBlobConfigTask(Graph g, Model m, String filename) {
 		this.filename = filename;
@@ -26,7 +26,7 @@ final class ReadBlobConfigTask extends Task {
 		progress(0);
 		setupGraph();
 		m.readConfiguration(filename);
-		bgf = new BlobGraphFuser(g, m);
+		bgf = new BlobGraphModel(g, m);
 		try {
 			bgf.populateGraphFromModelAPB(this);
 		} catch (InterruptedException e) {
