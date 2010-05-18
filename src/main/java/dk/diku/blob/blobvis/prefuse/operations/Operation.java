@@ -1,51 +1,54 @@
 package dk.diku.blob.blobvis.prefuse.operations;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import model.Blob;
+import model.BondSite;
 import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
 import dk.diku.blob.blobvis.prefuse.StepResult;
 
 public abstract class Operation {
-	protected BlobGraphFuser state;
-	private Operation(){}
+	
+	public enum OP {
+		CHD,
+		SBS,
+		JB	
+	}
+	private static HashMap<String, OP> ops;
+	static {
+		ops = new HashMap<String,Operation.OP>();
+		ops.put("CHD", OP.CHD);
+		ops.put("SBS", OP.SBS);
+		ops.put("JB", OP.JB);
+		ops.put("JB", OP.JB);
+	}
 	protected Blob apb;
 	protected Blob adb;
-	private static Map<String,Operation> map = new HashMap<String,Operation>();
-	protected Operation(BlobGraphFuser state){
-		this.state=state;
-		apb = state.APB();
-		adb = state.ADB();
+	
+	public Operation args(List<String> args){
+		this.args = args;
+		return this;
 	}
-	public static Operation decodeOpcode(BlobGraphFuser bgf){
-
-
-		if (bgf.APB().opCode().startsWith("JB")) {
-			result = doJB(apb, adb);
-		} else if (bgf.APB().opCode().startsWith("DBS")
-				|| bgf.APB().opCode().startsWith("SCG")) {
-			result = new StepResult(apb, adb).reread(true);
-		} else if (bgf.APB().opCode().startsWith("CHD")) {
-			result = doCHD(apb, adb);
-		} else if (bgf.APB().opCode().startsWith("JCG")) {
-			result = doJCG(apb, adb);
-		} else if (bgf.APB().opCode().startsWith("SBS")) {
-			result = doSBS(apb, adb);
-
-		} else if (bgf.APB().opCode().startsWith("JN")) {
-			result = doJN(apb, adb);
-		} else if (bgf.APB().opCode().startsWith("SWL")) {
-			result = doSWL(apb, adb);
-		} else {
-			result = new StepResult(apb, adb); // Default action
-		}
-		if (bgf.APB().opCode().startsWith("CHD")){
-			return new CHD(bgf);
-		}else{
-			return null;
-		}
-
+	
+	public void setFocusBlobs(BlobGraphFuser bgf){
+		apb = bgf.ADB();
+		adb = bgf.APB();
 	}
-	public abstract StepResult prepare(Blob apb, Blob adb);
+	
+	public String op;
+	public List<String> args;
+	protected Operation(String op){
+		this.op = op;
+	}
+
+	public static OP parse(String opCode) {
+		String[] raw = opCode.split(" ");
+		ops.get(raw[0]);
+		return null;
+	}
+		
 }

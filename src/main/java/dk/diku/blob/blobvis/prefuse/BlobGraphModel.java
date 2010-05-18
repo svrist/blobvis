@@ -9,7 +9,6 @@ import java.util.Map;
 
 import model.Model;
 import prefuse.data.Graph;
-import dk.diku.blob.blobvis.prefuse.operations.Operation;
 
 public class BlobGraphModel extends BlobGraphFuser {
 	private static final String STEP_EVENT_KEY = "===STEP====";
@@ -52,9 +51,4 @@ public class BlobGraphModel extends BlobGraphFuser {
 	public void registerStepListener(ActionListener a){
 		registerOpcodeListener(STEP_EVENT_KEY, a);
 	}
-	public void step() {
-		Operation o = Operation.decodeOpcode(this);
-		execute(o.prepare());
-	}
-
 }

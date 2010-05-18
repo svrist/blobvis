@@ -17,6 +17,8 @@ import prefuse.data.Tuple;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
 import dk.diku.blob.blobvis.gui.Progressable;
+import dk.diku.blob.blobvis.prefuse.operations.CHD;
+import dk.diku.blob.blobvis.prefuse.operations.Operation;
 import dk.diku.blob.blobvis.util.Pair;
 
 public class BlobGraphFuser {
@@ -477,6 +479,38 @@ public class BlobGraphFuser {
 	public Blob ADB() {
 		return m.ADB();
 	}
+	
+	public void step(){
+		StepResult result;
+		
+		Operation.OP o = Operation.parse(APB().opCode());
+		
+		if (APB().opCode().startsWith("JB")) {
+			result = doJB(APB(), ADB());
+		} else if (APB().opCode().startsWith("DBS")
+				|| APB().opCode().startsWith("SCG")) {
+			result = new StepResult(APB(), ADB()).reread(true);
+		} else if (APB().opCode().startsWith("CHD")) {
+			result = doCHD(APB(), ADB());
+		} else if (APB().opCode().startsWith("JCG")) {
+			result = doJCG(APB(), ADB());
+		} else if (APB().opCode().startsWith("SBS")) {
+			result = doSBS(APB(), ADB());
+		} else if (APB().opCode().startsWith("JN")) {
+			result = doJN(APB(), ADB());
+		} else if (APB().opCode().startsWith("SWL")) {
+			result = doSWL(APB(), ADB());
+		} else {
+			result = new StepResult(APB(), ADB()); // Default action
+		}
+		execute(result);
+	}
+	
+	public void execute(CHD c){
+		System.out.println("CHD"+c);
+		BondSite b = BondSite.create(Integer.valueOf(c.args.get(0)));
+		execute(new StepResult(APB(),ADB()).adbNext(b));
+	}
 
 	public void execute(StepResult sr){
 		sr.testValid();
@@ -488,6 +522,135 @@ public class BlobGraphFuser {
 		if (sr.reread_cargo){
 			rereadCargo(sr.adbnext);
 		}
+	}
+	
+
+	private StepResult doSWL(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b1 = BondSite
+		.create(((8 + 4) & apb.getCargo()) / 4);
+		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+		result = new StepResult(apb, adb);
+
+		Blob adb_b1 = adb.follow(b1);
+		Node adb_b1n = null;
+		BondSite ts2 = null;
+		if (adb_b1 != null) {
+			ts2 = adb_b1.boundTo(adb);
+			adb_b1n = getNode(adb_b1);
+		}
+		Blob adb_b2 = adb.follow(b2);
+		Blob adb_b2_b1 = null;
+		if (adb_b2 != null) {
+			adb_b2_b1 = adb_b2.follow(b1);
+			Node adb_b2n = getNode(adb_b2);
+			if (adb_b2_b1 != null) {
+				BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
+				// TODO: Blob.link( ADB, adb_b2_b1, b1, ts1 );
+				Node adb_b2_b1n = getNode(adb_b2_b1);
+				linkNodes(getNode(adb), b1, adb_b2_b1n, ts1);
+				if (adb_b1 != null) {
+					// TODO: Blob.link( adb_b2, adb_b1, b1, ts2 );
+					linkNodes(adb_b2n, b1, adb_b1n, ts2);
+					// case 4: something(x) on b1 and something(y)
+					// on
+					// b2.b1 -> b1=y, b2.b1=x
+				} else {
+
+					// Case 2: Nothing on b1 and something(x) on
+					// b2.b1
+					// -> b2.b1=null,b1=x
+					// TODO: adb_b2.unlink( b1 );
+					removeEdge(adb_b2n, adb_b2_b1n);
+				}
+			} else if (adb_b1 != null) {
+				// case 3: Something(x) on b1 and nothing on b2.b1
+				// ->
+				// b2.b1=x,b1=nothing
+				// TODO:Blob.link( adb_b2,adb_b1 , b1, ts2 );
+				linkNodes(adb_b2n, b1, adb_b1n, ts2);
+				// TODO: ADB.unlink( b1 );
+				removeEdge(getNode(adb), adb_b1n);
+			} else {
+				/* System.out.println("Case 6"); */
+				// case 6: Nothing on b1 and nothing on b2.b1 ->
+				// nothing
+				// happens
+			}
+		} else if (adb_b1 != null) {
+			// case 5: something(x) on b1 and nothing on b2 ->
+			// b1=null,
+			// x disappers
+			// TODO: Blob.unlink( ADB, adb_b1, b1, ts2 );
+			removeEdge(getNode(adb), adb_b1n);
+		} else {
+			// Case 1: Nothing on b1 and nothing on b2 -> nothing
+			// happens
+		}
+		return result;
+	}
+
+	private StepResult doJN(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b1 = BondSite
+		.create(((8 + 4) & apb.getCargo()) / 4);
+		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+
+		Blob dest1 = adb.follow(b1);
+		Blob dest = dest1.follow(b2);
+		Node destn = getNode(dest);
+		if (dest != null) {
+			BondSite ds = dest.boundTo(dest1);
+			linkNodes(getNode(adb), b1, destn, ds);
+		} else {
+			Node n = getNode(dest1);
+			removeEdge(getNode(adb), n);
+		}
+		result = new StepResult(apb, adb);
+		return result;
+	}
+
+	private StepResult doSBS(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b1 = BondSite
+		.create(((8 + 4) & apb.getCargo()) / 4);
+		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+		Blob bb1 = adb.follow(b1);
+		Blob bb2 = adb.follow(b2);
+		if (bb1 != null) {
+			setSrcBondSite(getNode(adb), bb1, b2);
+		}
+		if (bb2 != null) {
+			setSrcBondSite(getNode(adb), bb2, b1);
+		}
+		result = new StepResult(apb, adb);
+		return result;
+	}
+
+	private StepResult doJCG(Blob apb, Blob adb) {
+		StepResult result;
+		int c = (4 + 2 + 1) & apb.getCargo();
+		result = new StepResult(apb, adb);
+		if (!adb.getCargo(c)) {
+			result.apbNext(BondSite.West);
+		}
+		return result;
+	}
+
+	private StepResult doCHD(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+		result = new StepResult(apb, adb).adbNext(b);
+		return result;
+	}
+
+	private StepResult doJB(Blob apb, Blob adb) {
+		StepResult result;
+		result = new StepResult(apb, adb).reread(false);
+		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+		result.apbNext(apb.follow(m.ADB().follow(b) == null ? BondSite.West
+				: BondSite.South));
+		return result;
 	}
 
 }
