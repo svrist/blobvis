@@ -32,8 +32,6 @@ import javax.swing.ProgressMonitor;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import model.Blob;
-import model.BondSite;
 import model.Model;
 import prefuse.Constants;
 import prefuse.Display;
@@ -52,7 +50,6 @@ import prefuse.controls.ControlAdapter;
 import prefuse.controls.PanControl;
 import prefuse.controls.WheelZoomControl;
 import prefuse.data.Graph;
-import prefuse.data.Node;
 import prefuse.render.DefaultRendererFactory;
 import prefuse.render.LabelRenderer;
 import prefuse.util.ColorLib;

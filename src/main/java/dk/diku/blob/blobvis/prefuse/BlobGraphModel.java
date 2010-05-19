@@ -20,12 +20,15 @@ public class BlobGraphModel extends BlobGraphFuser {
 	}
 
 	@Override
-	public void execute(StepResult sr){
+	protected void execute(StepResult sr){
 		super.execute(sr);
 		fireEvent(sr.apbnext.opCode(),sr);
 		fireEvent(STEP_EVENT_KEY,sr);
 	}
 
+	/* (non-Javadoc)
+	 * @see dk.diku.blob.blobvis.prefuse.ModelActionExecutor#registerOpcodeListener(java.lang.String, java.awt.event.ActionListener)
+	 */
 	public void registerOpcodeListener(String opcode, ActionListener a){
 		List<ActionListener> al;
 		if (listeners.containsKey(opcode)){
@@ -48,6 +51,9 @@ public class BlobGraphModel extends BlobGraphFuser {
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see dk.diku.blob.blobvis.prefuse.ModelActionExecutor#registerStepListener(java.awt.event.ActionListener)
+	 */
 	public void registerStepListener(ActionListener a){
 		registerOpcodeListener(STEP_EVENT_KEY, a);
 	}
