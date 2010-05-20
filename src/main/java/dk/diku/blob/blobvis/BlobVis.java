@@ -1,5 +1,6 @@
 package dk.diku.blob.blobvis;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Cursor;
@@ -32,7 +33,6 @@ import javax.swing.ProgressMonitor;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import model.Model;
 import prefuse.Constants;
 import prefuse.Display;
 import prefuse.Visualization;
@@ -43,6 +43,7 @@ import prefuse.action.animate.VisibilityAnimator;
 import prefuse.action.assignment.ColorAction;
 import prefuse.action.assignment.DataColorAction;
 import prefuse.action.assignment.FontAction;
+import prefuse.action.assignment.StrokeAction;
 import prefuse.action.filter.GraphDistanceFilter;
 import prefuse.action.layout.graph.ForceDirectedLayout;
 import prefuse.action.layout.graph.RadialTreeLayout;
@@ -85,7 +86,7 @@ public class BlobVis extends JPanel {
 	// Prefuse layers
 	private Visualization m_vis;
 	private Display display;
-	private Graph g;
+	//private Graph g;
 	private VisualGraph vg;
 
 	// defaults
@@ -93,9 +94,6 @@ public class BlobVis extends JPanel {
 
 	// Shared filter.
 	final GraphDistanceFilter filter;
-
-	// Blob simulator model.
-	private Model m;
 
 	// Bonding between Prefuse graph and blob simulator model.
 	private BlobGraphModel bgf;
@@ -110,6 +108,10 @@ public class BlobVis extends JPanel {
 	// State flags
 	private boolean ended = true;
 	boolean paused = false;
+
+	private boolean greyScale;
+
+	private ActionList colorsetup;
 
 	private final class PopupListener extends ControlAdapter {
 		@Override
@@ -138,7 +140,6 @@ public class BlobVis extends JPanel {
 			}
 		}
 	}
-
 	public class PauseForceAction implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -152,105 +153,33 @@ public class BlobVis extends JPanel {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-
+			// ensure that a force simulation is running during this operation.
 			tmpRunForce1s();
 
-
-			bgf.registerOpcodeListener("EXT", new ActionListener() {
-				@Override
-				public void actionPerformed(ActionEvent arg0) {
-					ended = true;
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e1) {
-						e1.printStackTrace();
-					}
-					step.setEnabled(false);
-					tmpStopForce();
-				}
-			});
-			bgf.registerStepListener(new ActionListener() {
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					StepResult sr = (StepResult) e.getSource();
-					VisualItem vnn = (VisualItem) vg.getNode(bgf.getNode(sr.apbnext).getRow());
-					m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
-				}
-			});
-
-
-
+			// Make sure that all steps are finished before a new one is executed.
 			synchronized (m_vis) {
-				if (ended) {
+				if (ended) { // Dont do anything at ext nodes.
 					System.out.println("At EXT. Done");
 					return;
 				}
 				bgf.step();
 				return;
-				/*Node r = bgf.getRoot();
-				Blob apb = (Blob) r.get(BFConstants.BLOBFIELD);
-				Blob adb = apb.follow(BondSite.North);
-				StepResult result;
-
-
-				if (apb.opCode().startsWith("JB")) {
-					result = doJB(apb, adb);
-				} else if (apb.opCode().startsWith("DBS")
-						|| apb.opCode().startsWith("SCG")) {
-					result = new StepResult(apb, adb).reread(true);
-				} else if (apb.opCode().startsWith("CHD")) {
-					result = doCHD(apb, adb);
-				} else if (apb.opCode().startsWith("JCG")) {
-					result = doJCG(apb, adb);
-				} else if (apb.opCode().startsWith("SBS")) {
-					result = doSBS(apb, adb);
-
-				} else if (apb.opCode().startsWith("JN")) {
-					result = doJN(apb, adb);
-				} else if (apb.opCode().startsWith("SWL")) {
-					result = doSWL(apb, adb);
-				} else {
-					result = new StepResult(apb, adb); // Default action
-				}
-				bgm.execute(result);
-
-				/*				Blob next = apb.follow(apbBsNext);
-				Node nn = bgf.getNode(next);
-				bgf.updateTheBug(r, nn, adbn, adbnnext);
-				stepModel(r, nn);
-				if (reread) {
-					bgf.rereadCargo(m.ADB());
-				}
-
-				if (next.opCode().equals("EXT")) {
-					ended = true;
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e1) {
-						e1.printStackTrace();
-					}
-					step.setEnabled(false);
-					tmpStopForce();
-				}*/
-
 			}
 		}
-
-
 		private void tmpRunForce1s() {
 			if (paused) {
 				m_vis.cancel("1sforce");
 				m_vis.run("1sforce");
 			}
 		}
-
-
-
 	}
 
 
 	public BlobVis() {
 		super(new BorderLayout());
+		bgf = new BlobGraphModel();
+
+
 
 		m_vis = new Visualization();
 		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
@@ -258,6 +187,7 @@ public class BlobVis extends JPanel {
 		setupRenderer();
 		setupActions();
 		setupDisplay();
+		setupModelStepListeners();
 
 		JPanel panel = new JPanel();
 		step = new JButton("Step model");
@@ -272,6 +202,28 @@ public class BlobVis extends JPanel {
 		ended = true;
 		disableButtons();
 		restart.setEnabled(false);
+
+
+	}
+
+	private void setupModelStepListeners() {
+		bgf.registerOpcodeListener("EXT", new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				ended = true;
+				step.setEnabled(false);
+				tmpStopForce();
+				m_vis.run("1sforce");
+			}
+		});
+		bgf.registerStepListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				StepResult sr = (StepResult) e.getSource();
+				VisualItem vnn = (VisualItem) vg.getNode(bgf.getNode(sr.apbnext).getRow());
+				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
+			}
+		});
 	}
 
 	private void readData(String filename) {
@@ -384,21 +336,23 @@ public class BlobVis extends JPanel {
 		ActionList init = new ActionList();
 
 		init.add(filter);
-		init.add(getColorSetup());
+		colorsetup =getColorSetup(greyScale);
+		init.add(colorsetup);
 		init.add(new RadialTreeLayout(GRAPH));
 		// init.add(new RandomLayout());
 		init.add(new RepaintAction());
 
 		ActionList singleforce = new ActionList(1000);
 		singleforce.add(filter);
-		singleforce.add(getColorSetup());
+
+		singleforce.add(colorsetup);
 		singleforce.add(new ForceDirectedLayout(GRAPH));
 		singleforce.add(new RepaintAction());
 		m_vis.putAction("1sforce", singleforce);
 
 		ActionList basePaused = new ActionList(1000);
 		basePaused.add(filter);
-		basePaused.add(getColorSetup()); // base.add(new AggregateLayout(AGGR));
+		basePaused.add(colorsetup); // base.add(new AggregateLayout(AGGR));
 		basePaused.add(new RepaintAction());
 		m_vis.putAction("basepaused", basePaused);
 
@@ -410,18 +364,21 @@ public class BlobVis extends JPanel {
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(filter);
-		force.add(getColorSetup());
+		force.add(colorsetup);
 		force.add(new ForceDirectedLayout(GRAPH));
 		// force.add(AggrForce());
 		force.add(new RepaintAction());
+
 		m_vis.putAction("force", force);
 		m_vis.putAction("init", init);
 	}
 
+	/**
+	 * Start actions if the graph is ready.
+	 */
 	protected void runEverything() {
-		if (g != null) {
+		if (bgf.getGraph() != null) {
 			m_vis.run("init");
-
 			tmpRestartForce();
 			if (!paused) {
 				m_vis.cancel("pausedactions");
@@ -429,12 +386,22 @@ public class BlobVis extends JPanel {
 		}
 	}
 
+	/**
+	 * Stop force simulation actions.
+	 * 
+	 * Helper for force simulation action controls.
+	 */
 	private void stopForce() {
 		m_vis.cancel("force");
 		pause.setText("Start force simulation");
 		paused = true;
 	}
 
+	/**
+	 * Start force simulation actions.
+	 * 
+	 * Helper for force simulation action controls.
+	 */
 	private void startForce() {
 		m_vis.run("force");
 		pause.setText("Pause force simulation");
@@ -465,55 +432,101 @@ public class BlobVis extends JPanel {
 	 * @return true if new state is "running"
 	 */
 	private boolean toggleForce() {
-		if (paused) {
-			startForce();
-			return true;
-		} else {
+		if (m_vis.getAction("force").isRunning()) {
 			stopForce();
 			return false;
+		} else {
+			startForce();
+			return true;
 		}
 	}
 
-	private ActionList getColorSetup() {
+	private void toggleGreyscale(){
+		greyScale = !greyScale;
+		colorsetup = getColorSetup(greyScale);
+		System.out.println(colorsetup);
 
+		String[] actionlist = {"force","1sforce","init" };
+		for (String s : actionlist) {
+			ActionList al = (ActionList)m_vis.getAction(s);
+			boolean isRunning=al.isRunning();
+			if (isRunning){
+				m_vis.cancel(s);
+			}
+			System.out.println(al);
+			System.out.println("remove: "+al.remove(1));
+			//al.add(1,colorsetup);
+
+			if (isRunning){
+				m_vis.run(s);
+			}
+
+		}
+
+
+	}
+
+	/**
+	 * Setup colors for nodes, edges, text and the different types of nodes.
+	 * @param greyScale2
+	 * @return an ActionList with the complete setup.
+	 */
+	private static ActionList getColorSetup(boolean greyScale) {
 		// set up the visual operators
 		// first set up all the color actions
 		ColorAction nStroke = new ColorAction(NODES, VisualItem.STROKECOLOR);
 		nStroke.setDefaultColor(ColorLib.gray(100));
-		nStroke.add("_hover", ColorLib.gray(50));
+		//nStroke.add("_hover", ColorLib.gray(50));
 
 		ColorAction nFill = new ColorAction(NODES, VisualItem.FILLCOLOR,
 				ColorLib.gray(255));
 
-		nFill.add("_hover", ColorLib.gray(100));
-		nFill.add(VisualItem.FIXED, ColorLib.rgb(255, 100, 100));
-		nFill.add(VisualItem.HIGHLIGHT, ColorLib.rgb(255, 200, 125));
+		//nFill.add("_hover", ColorLib.gray(100));
+		//		nFill.add(VisualItem.FIXED, ColorLib.rgb(255, 100, 100));
+		//	nFill.add(VisualItem.HIGHLIGHT, ColorLib.rgb(255, 200, 125));
 
 		ColorAction nEdges = new ColorAction(EDGES, VisualItem.STROKECOLOR);
 		nEdges.setDefaultColor(ColorLib.gray(100));
 		ColorAction nEdgesText = new ColorAction(EDGES, VisualItem.TEXTCOLOR,
 				ColorLib.gray(0));
 
-		ColorAction nText = new ColorAction(NODES, VisualItem.TEXTCOLOR,
-				ColorLib.rgb(0, 0, 0));
+		StrokeAction sa = new StrokeAction(NODES);
 
-		ColorAction aStroke = new ColorAction(AGGR, VisualItem.STROKECOLOR);
-		aStroke.setDefaultColor(ColorLib.gray(200));
-		aStroke.add("_hover", ColorLib.rgb(255, 100, 100));
+		sa.add("["+BFConstants.BLOBTYPE+"] <= "+BFConstants.BLOB_TYPE_APB, new BasicStroke(2.5f));
+
+		StrokeAction sa2 = new StrokeAction(EDGES);
+		sa2.add("["+BFConstants.EDGENUMBERSRC+"] = 0", new BasicStroke(2.5f));
+
+		ColorAction nText = new ColorAction(NODES, VisualItem.TEXTCOLOR,
+				ColorLib.gray(0));
 
 		ActionList colors = new ActionList();
 
-		int[] palette = new int[] { ColorLib.rgba(255, 200, 200, 210), // adb
-				// 0
-				ColorLib.rgba(100, 255, 000, 210), // apb 1
-				ColorLib.rgba(255, 110, 110, 210), // data 2
-				ColorLib.rgba(200, 255, 200, 210), // inpgr 3
-		};
-		ColorAction nFillAdb = new DataColorAction(NODES, BFConstants.BLOBTYPE,
-				Constants.NOMINAL, VisualItem.FILLCOLOR, palette);
+		int[] palette;
+
+		if (greyScale){
+			palette = new int[] {
+					ColorLib.gray(255),
+					ColorLib.gray(255),
+					ColorLib.gray(160),
+					ColorLib.gray(200),
+			};
+		}else{
+			palette = new int[] {
+					ColorLib.rgba(255, 110, 110, 210), // adb 0
+					ColorLib.rgba(100, 255, 000, 210), // apb 1
+					ColorLib.rgba(255, 200, 200, 210), // data 2
+					ColorLib.rgba(200, 255, 200, 210), // inpgr 3
+			};
+		}
+		DataColorAction nFillAdb = new DataColorAction(NODES, BFConstants.BLOBTYPE,
+				Constants.NUMERICAL, VisualItem.FILLCOLOR, palette);
+		nFillAdb.setBinCount(4);
+		nFillAdb.setScale(Constants.LINEAR_SCALE);
 
 		// bundle the color actions
-
+		colors.add(sa);
+		colors.add(sa2);
 		colors.add(nStroke);
 		colors.add(nFill);
 		colors.add(nFillAdb);
@@ -522,18 +535,24 @@ public class BlobVis extends JPanel {
 		colors.add(new FontAction(EDGES, FontLib.getFont("SansSerif",
 				Font.PLAIN, 8)));
 		colors.add(nText);
-		colors.add(aStroke);
+
+
 		return colors;
 	}
 
+	/**
+	 * When a graph is ready make it a visual graph, and make the first node
+	 * the focus of the visualization.
+	 * @param g The graph with all the nodes.
+	 * @return A visual graph.
+	 */
 	public VisualGraph setGraph(Graph g) {
 		// update graph
 		m_vis.removeGroup(GRAPH);
-		VisualGraph vg = m_vis.addGraph(GRAPH, g);
+		vg = m_vis.addGraph(GRAPH, g);
 		bgf.setVisualGraph(vg);
 		m_vis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
 		VisualItem f = (VisualItem) vg.getNode(0);
-		// .getChild(1);
 		m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
 		f.setFixed(false);
 		return vg;
@@ -560,10 +579,11 @@ public class BlobVis extends JPanel {
 		progressMonitor.setProgress(0);
 
 		// Create empy models and graphs.
-		g = new Graph();
-		m = new Model();
-		final ReadBlobConfigTask t = new ReadBlobConfigTask(g, m, filename);
+		bgf.reset();
+		// Setup task
+		final ReadBlobConfigTask t = new ReadBlobConfigTask(filename,bgf);
 
+		// add progress and done listeners.
 		t.addPropertyChangeListener(new PropertyChangeListener() {
 			boolean canceled = false;
 
@@ -585,8 +605,7 @@ public class BlobVis extends JPanel {
 						canceled = true;
 					} else if (canceled == false && ended != false) {
 						ended = false;
-						bgf = t.bgf;
-						vg = setGraph(g);
+						setGraph(bgf.getGraph());
 						runEverything();
 						currentFile = filename;
 						restart.setEnabled(true);
@@ -596,11 +615,16 @@ public class BlobVis extends JPanel {
 				}
 			}
 		});
-		m_vis.removeGroup(GRAPH);
+
 		t.execute();
 
 	}
 
+	/**
+	 * Disable all irrellevant buttons
+	 * 
+	 * For example when loading a big graph
+	 */
 	private void disableButtons() {
 		System.out.println("Disable buttons");
 		pause.setEnabled(false);
@@ -608,6 +632,11 @@ public class BlobVis extends JPanel {
 		slider.setEnabled(false);
 	}
 
+	/**
+	 * Enable the buttons
+	 * 
+	 * For example when the model and graph is ready.
+	 */
 	protected void enableButtons() {
 		System.out.println("Enable buttons");
 		pause.setEnabled(true);
@@ -616,7 +645,6 @@ public class BlobVis extends JPanel {
 	}
 
 	public static void main(String[] argv) {
-
 		// provide a final pointer to the filename while still being able to
 		// change the value dynamically.
 		final String[] filename = new String[1];
@@ -637,6 +665,11 @@ public class BlobVis extends JPanel {
 
 	}
 
+	/**
+	 * Setup and display the main frame.
+	 * @param filename Filename to load (if any)
+	 * @return JFrame
+	 */
 	public static JFrame start(String filename) {
 		UILib.setPlatformLookAndFeel();
 		JFrame frame = new JFrame("dikuBlob - B l o b V i s");
@@ -657,6 +690,10 @@ public class BlobVis extends JPanel {
 		return frame;
 	}
 
+	/**
+	 * Setup the menubar item "data"
+	 * @return The menubar item "data"
+	 */
 	private static JMenu setupDataMenu() {
 		JMenu dataMenu = new JMenu("Data");
 		dataMenu.add("Save current data to .bld file...");
@@ -664,10 +701,17 @@ public class BlobVis extends JPanel {
 		return dataMenu;
 	}
 
+	/**
+	 * Setup the menubar item "file"
+	 * @param ad The blobvis being visualized
+	 * @return The menubar item "file"
+	 */
 	private static JMenu setupFileMenu(final BlobVis ad) {
 		JMenu fileMenu = new JMenu("File");
 		fileMenu.add(new OpenGraphAction(ad, prefs));
 
+		// Export screenshot action, copied from prefuse to be included in my
+		// menu instead of only as keyboard shortcut.
 		ExportDisplayAction eda = new ExportDisplayAction(ad.m_vis
 				.getDisplay(0));
 		eda.putValue(AbstractAction.NAME, "Export Screenshot...");
@@ -678,13 +722,15 @@ public class BlobVis extends JPanel {
 
 		// a group of check box menu items
 		fileMenu.addSeparator();
+
+		// Show debug information, copied from prefuse to be included in my
+		// menu instead of only as keyboard shortcut.
 		JCheckBoxMenuItem cbMenuItem;
 		cbMenuItem = new JCheckBoxMenuItem("Display Debug Information");
 		cbMenuItem.setMnemonic('d');
 		cbMenuItem.setAccelerator(KeyStroke.getKeyStroke("ctrl D"));
 		cbMenuItem.addActionListener(new ActionListener() {
 			private PaintListener m_debug = null;
-
 			public void actionPerformed(ActionEvent e) {
 				if (m_debug == null) {
 					m_debug = new DebugStatsPainter();
@@ -697,7 +743,20 @@ public class BlobVis extends JPanel {
 			}
 		});
 		fileMenu.add(cbMenuItem);
+
+		JCheckBoxMenuItem cbgreyItem;
+		cbgreyItem = new JCheckBoxMenuItem("GreyScale");
+		cbgreyItem.setMnemonic('g');
+		cbgreyItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
+		cbgreyItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				ad.toggleGreyscale();
+			}
+		});
+		fileMenu.add(cbgreyItem);
 		fileMenu.addSeparator();
+
 		JMenuItem exitItem = new JMenuItem("Exit");
 		exitItem.setMnemonic('x');
 		exitItem.addActionListener(new ActionListener() {
@@ -705,6 +764,7 @@ public class BlobVis extends JPanel {
 				System.exit(0);
 			}
 		});
+
 		fileMenu.add(exitItem);
 		fileMenu.setMnemonic('F');
 		return fileMenu;

@@ -12,6 +12,7 @@ public class StepResult {
 	public Blob adbcur;
 	public Blob apbcur;
 	public boolean reread_cargo = false;
+	public boolean nostep = false;
 
 	public StepResult(Blob apbcur, Blob adbcur) {
 		this.adbcur = adbcur;
@@ -36,6 +37,11 @@ public class StepResult {
 
 	public StepResult reread(boolean flag) {
 		reread_cargo = flag;
+		return this;
+	}
+
+	public StepResult nostep(boolean flag){
+		nostep = flag;
 		return this;
 	}
 

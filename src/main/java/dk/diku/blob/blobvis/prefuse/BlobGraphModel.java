@@ -7,15 +7,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import model.Model;
-import prefuse.data.Graph;
-
 public class BlobGraphModel extends BlobGraphFuser {
 	private static final String STEP_EVENT_KEY = "===STEP====";
 	private Map<String,List<ActionListener>> listeners;
 
-	public BlobGraphModel(Graph g, Model m){
-		super(g,m);
+	public BlobGraphModel(){
+		super();
 		listeners = new HashMap<String,List<ActionListener>>();
 	}
 

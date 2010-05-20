@@ -18,17 +18,17 @@ public class BFConstants {
 	public static final String LABEL = "label";
 	/** Node table schema used for generated Graphs */
 	public static final Schema LABEL_SCHEMA = new Schema();
-	
-	public static final int BLOB_TYPE_DATA = 0;
-	public static final int BLOB_TYPE_APB = 1;
-	public static final int BLOB_TYPE_ADB = 2;
-	public static final int BLOB_TYPE_INPGR = 3;
+
+	public static final Integer BLOB_TYPE_ADB = 0;
+	public static final Integer BLOB_TYPE_APB = 1;
+	public static final Integer BLOB_TYPE_DATA = 2;
+	public static final Integer BLOB_TYPE_INPGR = 3;
 
 
 	static {
 		BLOB_SCHEMA.addColumn(BLOBFIELD, Blob.class, null);
 		BLOB_SCHEMA.addColumn(BLOBINPGR, Boolean.class, true);
-		BLOB_SCHEMA.addColumn(BLOBTYPE, Integer.class, 0);
+		BLOB_SCHEMA.addColumn(BLOBTYPE, double.class, 4);
 		/*BLOB_SCHEMA.addColumn(BLOBBS+0, Node.class);
 		BLOB_SCHEMA.addColumn(BLOBBS+1, Node.class);
 		BLOB_SCHEMA.addColumn(BLOBBS+2, Node.class);
