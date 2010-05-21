@@ -1,6 +1,5 @@
 TODO:
 
- - Zoom Buttons
  - Preferences dialog
 	* Force Sliders
 	* Play model speed
