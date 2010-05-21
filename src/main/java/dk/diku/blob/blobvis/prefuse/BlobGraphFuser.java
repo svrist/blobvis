@@ -58,6 +58,14 @@ public class BlobGraphFuser implements BlobFuser {
 	/* (non-Javadoc)
 	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
 	 */
+	public void addEdge(Blob b1,BondSite bs1, Blob b2,BondSite bs2){
+		Blob.link(b1, b2, bs1, bs2);
+		addEdge(b1,b2);
+	}
+
+	/* (non-Javadoc)
+	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
+	 */
 	public void addEdge(Blob b1,Blob b2){
 		FuseUtil.addEdge(getGraph(),getNode(b1),b1,getNode(b2),b2);
 	}
@@ -133,6 +141,11 @@ public class BlobGraphFuser implements BlobFuser {
 		saveRoot(getNode(getModel().APB()));
 	}
 
+	public Blob addDataBlobToBondSite(Blob b, BondSite from,
+			BondSite to, int cargo) {
+		return addDataBlobToBondSite(getNode(b),from,to,cargo);
+	}
+
 	/**
 	 * Insert a new Blob at item with the given bondsites as connection points
 	 * and with the given cargo
@@ -141,14 +154,14 @@ public class BlobGraphFuser implements BlobFuser {
 	 * @param to Bondsite on the new node
 	 * @param cargo The cargo to set.
 	 */
-	public void addDataBlobToBondSite(VisualItem item, BondSite from,
+	public Blob addDataBlobToBondSite(Tuple item, BondSite from,
 			BondSite to, int cargo) {
-		addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
+		return addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
 				false, cargo);
 
 	}
 
-	private Node addBlobToBondSite(Tuple n, Blob blob, BondSite from,
+	private Blob addBlobToBondSite(Tuple n, Blob blob, BondSite from,
 			BondSite to, boolean inPgr, int cargo) {
 
 		// Add to simulator
@@ -173,7 +186,7 @@ public class BlobGraphFuser implements BlobFuser {
 		// BlobGraphFuser invariant bookkeeping.
 		setRelation(bn, newn);
 
-		return newn;
+		return bn;
 	}
 
 	public Blob getBlob(Tuple item) {

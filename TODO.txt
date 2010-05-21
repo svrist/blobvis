@@ -1,0 +1,8 @@
+TODO:
+
+ - Zoom Buttons
+ - Preferences dialog
+	* Force Sliders
+	* Play model speed
+	* Gray scale colors
+ - Record Movie

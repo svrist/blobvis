@@ -36,6 +36,24 @@ public class AddGridData {
 
 	private static Random randGen = new Random();
 
+	public static BondSite randomBs(boolean inclNorth){
+		List<BondSite> ret = new ArrayList<BondSite>();
+		if (!inclNorth){
+			for (BondSite bs : BondSite.asList()) {
+				if (bs != BondSite.North) {
+					ret.add(bs);
+				}
+			}
+		}else{
+			ret = BondSite.asList();
+		}
+		return ret.get(randGen.nextInt(ret.size()));
+	}
+
+	public static int randomCargo(){
+		return randGen.nextInt(128);
+	}
+
 	public static void showAddBlobGridDialog(Component c, BlobGraphFuser bgf, VisualItem item) {
 		Blob b = bgf.getBlob(item);
 		AddGridData agd = getAddGridData(c,b);
@@ -44,18 +62,26 @@ public class AddGridData {
 
 		if (agd.countNodes > 0) {
 			int count = agd.countNodes;
-			while (count > 0 && work.size() > 0) {
+			while (count > 0 && !work.isEmpty()) {
 				Blob cur = work.remove(0);
+				System.out.println("Adding to "+cur);
 				List<BondSite> freeBs = Blob.emptyBondSites(cur);
-
-				int card = randGen.nextInt(freeBs.size());
-				Collections.shuffle(freeBs);
-				List<BondSite> newsites = new ArrayList<BondSite>(freeBs
-						.subList(0, card));
-				for (BondSite bs : newsites) {
-					// bgf.addDataBlobToBondSite(item, from, to, cargo)
-
+				freeBs.remove(BondSite.North);
+				if (freeBs.size()>0){
+					int card = randGen.nextInt(freeBs.size())+1;
+					System.out.println("Chose to add "+card+" blobs");
+					Collections.shuffle(freeBs);
+					List<BondSite> newsites = new ArrayList<BondSite>(freeBs
+							.subList(0, card));
+					for (BondSite bs : newsites) {
+						Blob newb = bgf.addDataBlobToBondSite(cur, bs,
+								randomBs(false), randomCargo());
+						System.out.println(bs);
+						work.add(newb);
+						count--;
+					}
 				}
+
 
 			}
 
@@ -71,10 +97,12 @@ public class AddGridData {
 		while (c != null && !(c instanceof JFrame)) {
 			c = c.getParent();
 		}
-		final JDialog dialog = new JDialog((JFrame) c, "Add new Blob", true);
+		final JDialog dialog = new JDialog((JFrame) c, "Add new random Blobs", true);
 
 		// create the ok/cancel buttons
 		final JButton ok = new JButton("OK");
+		ok.setDefaultCapable(true);
+
 
 		JButton cancel = new JButton("Cancel");
 		cancel.addActionListener(new ActionListener() {
@@ -93,19 +121,29 @@ public class AddGridData {
 		bbox.add(Box.createHorizontalStrut(5));
 		// put everything into a panel
 		JPanel panel = new JPanel(new MigLayout());
+
+
+
 		NumberFormatter numformat = new NumberFormatter(NumberFormat
 				.getIntegerInstance());
 		numformat.setMinimum(1);
 		numformat.setMaximum(100);
 		final JFormattedTextField numberinput = new JFormattedTextField(
 				numformat);
-		numberinput.setValue(10);
-		ok.addActionListener(new ActionListener() {
+		ActionListener okAction = new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
+				System.out.println("OkAction");
 				agd.countNodes = (Integer) numberinput.getValue();
 				dialog.setVisible(false);
 			}
-		});
+		};
+
+		numberinput.addActionListener(okAction);
+		numberinput.setColumns(5);
+		numberinput.setValue(10);
+		ok.addActionListener(okAction);
+		numberinput.requestFocusInWindow();
+
 
 		panel.add(new JLabel("Blobs: "));
 		panel.add(numberinput, "wrap");

@@ -82,5 +82,10 @@
       <artifactId>prefuse</artifactId>
       <version>beta</version>
     </dependency>
+    <dependency>
+    <groupId>javax.media</groupId>
+    <artifactId>jmf</artifactId>
+    <version>2.1.1e</version>
+</dependency>
   </dependencies>
 </project>

@@ -33,13 +33,13 @@ import javax.swing.ProgressMonitor;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import net.miginfocom.swing.MigLayout;
 import prefuse.Constants;
 import prefuse.Display;
 import prefuse.Visualization;
 import prefuse.action.Action;
 import prefuse.action.ActionList;
 import prefuse.action.RepaintAction;
-import prefuse.action.animate.VisibilityAnimator;
 import prefuse.action.assignment.ColorAction;
 import prefuse.action.assignment.DataColorAction;
 import prefuse.action.assignment.FontAction;
@@ -81,7 +81,6 @@ public class BlobVis extends JPanel {
 	private static final String GRAPH = "graph";
 	private static final String EDGES = "graph.edges";
 	private static final String NODES = "graph.nodes";
-	private static final String AGGR = "aggregates";
 
 	// Prefuse layers
 	private Visualization m_vis;
@@ -90,7 +89,7 @@ public class BlobVis extends JPanel {
 	private VisualGraph vg;
 
 	// defaults
-	int hops = 15;
+	int hops = 5;
 
 	// Shared filter.
 	final GraphDistanceFilter filter;
@@ -102,6 +101,7 @@ public class BlobVis extends JPanel {
 	private ProgressMonitor progressMonitor;
 	private final JButton pause;
 	final JButton step;
+	final JButton play;
 	final JButton restart;
 	final JValueSlider slider;
 
@@ -109,7 +109,7 @@ public class BlobVis extends JPanel {
 	private boolean ended = true;
 	boolean paused = false;
 
-	private boolean greyScale;
+	private boolean grayScale;
 
 	private ActionList colorsetup;
 
@@ -143,7 +143,6 @@ public class BlobVis extends JPanel {
 	public class PauseForceAction implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			m_vis.cancel("pausedactions");
 			m_vis.cancel("basepaused");
 			toggleForce();
 		}
@@ -166,11 +165,15 @@ public class BlobVis extends JPanel {
 				return;
 			}
 		}
-		private void tmpRunForce1s() {
-			if (paused) {
-				m_vis.cancel("1sforce");
-				m_vis.run("1sforce");
-			}
+
+	}
+	public boolean isForcePaused(){
+		return !m_vis.getAction("force").isRunning();
+	}
+	private void tmpRunForce1s() {
+		if (isForcePaused()) {
+			m_vis.cancel("1sforce");
+			m_vis.run("1sforce");
 		}
 	}
 
@@ -190,8 +193,9 @@ public class BlobVis extends JPanel {
 		setupModelStepListeners();
 
 		JPanel panel = new JPanel();
-		step = new JButton("Step model");
-		restart = new JButton("Restart model");
+		step = new JButton("Step program");
+		restart = new JButton("Restart program");
+		play = new JButton("Play program");
 		pause = new JButton("Pause force movements");
 		slider = new JValueSlider("Distance", 0, 35, hops);
 
@@ -213,6 +217,7 @@ public class BlobVis extends JPanel {
 				ended = true;
 				step.setEnabled(false);
 				tmpStopForce();
+
 				m_vis.run("1sforce");
 			}
 		});
@@ -281,21 +286,43 @@ public class BlobVis extends JPanel {
 		pause.addActionListener(new PauseForceAction());
 		pause.setEnabled(true);
 		forcebuttons.add(pause);
+
 		forcebuttons.setBorder(BorderFactory
 				.createTitledBorder("Force simulation ctrl"));
 		forcebuttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
 				Short.MAX_VALUE));
+
 		return forcebuttons;
 	}
 
 	private Box setupStepButton() {
 		Box buttons = new Box(BoxLayout.X_AXIS);
+		JPanel mig = new JPanel(new MigLayout());
+		buttons.setBorder(BorderFactory.createTitledBorder("Blob Model"));
 		buttons.setAlignmentX(LEFT_ALIGNMENT);
+
 		step.addActionListener(new StepModelAction());
 		step.setEnabled(true);
-		buttons.setBorder(BorderFactory.createTitledBorder("Blob Model"));
-		buttons.add(step);
-		restart.addActionListener(new AbstractAction() {
+		mig.add(step);
+
+		play.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if(!ended && !m_vis.getAction("play").isRunning()){
+					m_vis.cancel("play");
+					m_vis.run("play");
+					play.setText("Stop program");
+				}else{
+					play.setText("Play program");
+					m_vis.cancel("play");
+				}
+			}
+		});
+
+
+		mig.add(play);
+		play.setEnabled(true);
+		restart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				tmpStopForce();
@@ -304,8 +331,10 @@ public class BlobVis extends JPanel {
 			}
 		});
 		restart.setEnabled(true);
-		buttons.add(restart);
+		mig.add(restart);
+
 		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE, Short.MAX_VALUE));
+		buttons.add(mig);
 		return buttons;
 	}
 
@@ -336,7 +365,7 @@ public class BlobVis extends JPanel {
 		ActionList init = new ActionList();
 
 		init.add(filter);
-		colorsetup =getColorSetup(greyScale);
+		colorsetup =getColorSetup(grayScale);
 		init.add(colorsetup);
 		init.add(new RadialTreeLayout(GRAPH));
 		// init.add(new RandomLayout());
@@ -344,7 +373,6 @@ public class BlobVis extends JPanel {
 
 		ActionList singleforce = new ActionList(1000);
 		singleforce.add(filter);
-
 		singleforce.add(colorsetup);
 		singleforce.add(new ForceDirectedLayout(GRAPH));
 		singleforce.add(new RepaintAction());
@@ -356,11 +384,11 @@ public class BlobVis extends JPanel {
 		basePaused.add(new RepaintAction());
 		m_vis.putAction("basepaused", basePaused);
 
-		ActionList pausedActions = new ActionList(500);
-		pausedActions.add(new VisibilityAnimator());
+		//ActionList pausedActions = new ActionList(500);
+		//pausedActions.add(new VisibilityAnimator());
 
-		m_vis.putAction("pausedactions", pausedActions);
-		m_vis.alwaysRunAfter("pausedactions", "basepaused");
+		//m_vis.putAction("pausedactions", pausedActions);
+		//m_vis.alwaysRunAfter("pausedactions", "basepaused");
 
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(filter);
@@ -368,6 +396,22 @@ public class BlobVis extends JPanel {
 		force.add(new ForceDirectedLayout(GRAPH));
 		// force.add(AggrForce());
 		force.add(new RepaintAction());
+
+		final ActionList playac = new ActionList(Action.INFINITY,500);
+		playac.add(new Action() {
+			@Override
+			public void run(double frac) {
+				synchronized (m_vis) {
+					step.doClick();
+					if (ended){
+						play.setText("Play program");
+						play.setEnabled(false);
+						playac.cancel();
+					}
+				}
+			}
+		});
+		m_vis.putAction("play",playac);
 
 		m_vis.putAction("force", force);
 		m_vis.putAction("init", init);
@@ -380,9 +424,7 @@ public class BlobVis extends JPanel {
 		if (bgf.getGraph() != null) {
 			m_vis.run("init");
 			tmpRestartForce();
-			if (!paused) {
-				m_vis.cancel("pausedactions");
-			}
+
 		}
 	}
 
@@ -413,6 +455,7 @@ public class BlobVis extends JPanel {
 	 */
 	private void tmpStopForce() {
 		m_vis.cancel("force");
+		pause.setText("Start force simulation");
 	}
 
 	/**
@@ -421,7 +464,9 @@ public class BlobVis extends JPanel {
 	private void tmpRestartForce() {
 		if (!paused) {
 			m_vis.run("force");
+			pause.setText("Pause force simulation");
 		} else {
+			pause.setText("Start force simulation");
 			m_vis.cancel("force");
 		}
 	}
@@ -441,37 +486,34 @@ public class BlobVis extends JPanel {
 		}
 	}
 
-	private void toggleGreyscale(){
-		greyScale = !greyScale;
-		colorsetup = getColorSetup(greyScale);
+	private void toggleGrayscale(){
+		grayScale = !grayScale;
+		colorsetup = getColorSetup(grayScale);
 		System.out.println(colorsetup);
 
-		String[] actionlist = {"force","1sforce","init" };
+		String[] actionlist = {"force","1sforce","init"};
 		for (String s : actionlist) {
-			ActionList al = (ActionList)m_vis.getAction(s);
-			boolean isRunning=al.isRunning();
-			if (isRunning){
-				m_vis.cancel(s);
-			}
-			System.out.println(al);
-			System.out.println("remove: "+al.remove(1));
-			//al.add(1,colorsetup);
-
+			boolean isRunning=m_vis.getAction(s).isRunning();
+			ActionList al = (ActionList)m_vis.removeAction(s);
+			al.remove(1);
+			al.add(1,colorsetup);
+			m_vis.putAction(s, al);
 			if (isRunning){
 				m_vis.run(s);
 			}
-
 		}
+		tmpRunForce1s();
+
 
 
 	}
 
 	/**
 	 * Setup colors for nodes, edges, text and the different types of nodes.
-	 * @param greyScale2
+	 * @param grayScale use grayscale colors or not.
 	 * @return an ActionList with the complete setup.
 	 */
-	private static ActionList getColorSetup(boolean greyScale) {
+	private static ActionList getColorSetup(boolean grayScale) {
 		// set up the visual operators
 		// first set up all the color actions
 		ColorAction nStroke = new ColorAction(NODES, VisualItem.STROKECOLOR);
@@ -504,7 +546,7 @@ public class BlobVis extends JPanel {
 
 		int[] palette;
 
-		if (greyScale){
+		if (grayScale){
 			palette = new int[] {
 					ColorLib.gray(255),
 					ColorLib.gray(255),
@@ -628,6 +670,7 @@ public class BlobVis extends JPanel {
 	private void disableButtons() {
 		System.out.println("Disable buttons");
 		pause.setEnabled(false);
+		play.setEnabled(false);
 		step.setEnabled(false);
 		slider.setEnabled(false);
 	}
@@ -640,6 +683,7 @@ public class BlobVis extends JPanel {
 	protected void enableButtons() {
 		System.out.println("Enable buttons");
 		pause.setEnabled(true);
+		play.setEnabled(true);
 		step.setEnabled(true);
 		slider.setEnabled(true);
 	}
@@ -744,17 +788,17 @@ public class BlobVis extends JPanel {
 		});
 		fileMenu.add(cbMenuItem);
 
-		JCheckBoxMenuItem cbgreyItem;
-		cbgreyItem = new JCheckBoxMenuItem("GreyScale");
-		cbgreyItem.setMnemonic('g');
-		cbgreyItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
-		cbgreyItem.addActionListener(new ActionListener() {
+		JCheckBoxMenuItem cbGrayItem;
+		cbGrayItem = new JCheckBoxMenuItem("GrayScale");
+		cbGrayItem.setMnemonic('g');
+		cbGrayItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
+		cbGrayItem.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				ad.toggleGreyscale();
+				ad.toggleGrayscale();
 			}
 		});
-		fileMenu.add(cbgreyItem);
+		fileMenu.add(cbGrayItem);
 		fileMenu.addSeparator();
 
 		JMenuItem exitItem = new JMenuItem("Exit");

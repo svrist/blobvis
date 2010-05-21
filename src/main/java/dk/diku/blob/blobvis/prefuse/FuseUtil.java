@@ -55,7 +55,7 @@ public class FuseUtil {
 			ret.setString(BFConstants.LABEL, "" + b.getCargo());
 		}
 		setNodeInPgr(ret, inPgr);
-		System.out.println("Add "+b+" "+b.opCode()+":"+b.hashCode()+":"+ret);
+
 		return ret;
 	}
 
@@ -73,7 +73,6 @@ public class FuseUtil {
 	 */
 	static void setNodeApb(Node n) {
 		n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_APB);
-		System.out.println(n+" is APB");
 	}
 
 	/**
@@ -87,7 +86,7 @@ public class FuseUtil {
 			n.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
 		}
 		n.set(BFConstants.BLOBINPGR,inPgr);
-		System.out.println("Set inpgr: "+n);
+
 
 	}
 
@@ -120,8 +119,6 @@ public class FuseUtil {
 				g.removeNode(n2);
 			}
 		}
-
-
 	}
 
 	public static void setNodeInPgr(Node n) {
