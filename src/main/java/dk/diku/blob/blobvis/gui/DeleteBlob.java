@@ -9,7 +9,6 @@ import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
 
 public class DeleteBlob {
 	public static void showConfirmDialogAndPerformDelete(Component c,BlobGraphFuser bgf,VisualItem vi) {
-
 		int result = JOptionPane.showConfirmDialog(c,
 				"Are you sure you want to delete this Blob?",
 				"Confirm blob deletion", JOptionPane.YES_NO_OPTION,
@@ -19,4 +18,5 @@ public class DeleteBlob {
 		}
 
 	}
+	private DeleteBlob(){	}
 }

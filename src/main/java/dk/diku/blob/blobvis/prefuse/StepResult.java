@@ -11,7 +11,7 @@ public class StepResult {
 	public Blob apbnext;
 	public Blob adbcur;
 	public Blob apbcur;
-	public boolean reread_cargo = false;
+	public boolean rereadCargo = false;
 	public boolean nostep = false;
 
 	public StepResult(Blob apbcur, Blob adbcur) {
@@ -36,7 +36,7 @@ public class StepResult {
 	}
 
 	public StepResult reread(boolean flag) {
-		reread_cargo = flag;
+		rereadCargo = flag;
 		return this;
 	}
 

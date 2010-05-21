@@ -14,6 +14,7 @@ import prefuse.visual.EdgeItem;
 import prefuse.visual.VisualItem;
 
 public class BlobEdgeRenderer extends EdgeRenderer {
+	private float zoomCutoff = 0.6f;
 
 	public BlobEdgeRenderer() {
 		super();
@@ -27,12 +28,12 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 	public BlobEdgeRenderer(int edgeType) {
 		super(edgeType);
 	}
-	
-	public BlobEdgeRenderer(float zoom_cutoff){
-		this.zoom_cutoff = zoom_cutoff; 
+
+	public BlobEdgeRenderer(float zoomCutoff){
+		this.zoomCutoff = zoomCutoff;
 	}
 
-	float zoom_cutoff = 0.6f;
+
 
 
 
@@ -53,8 +54,8 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 		if (!edge.canGet(BFConstants.EDGENUMBERSRC, Integer.class)){
 			return;
 		}
-		
-		boolean useInt = zoom_cutoff > Math.max(g.getTransform().getScaleX(),
+
+		boolean useInt = zoomCutoff > Math.max(g.getTransform().getScaleX(),
 				g.getTransform().getScaleY());
 		if (useInt){
 			return;
@@ -63,7 +64,7 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 
 		// Draw bond site text:
 		int textColor = item.getTextColor();
-/*
+		/*
 		Blob from = (Blob) item1.get(BlobFuse.BLOBFIELD);
 		Blob to = (Blob) item2.get(BlobFuse.BLOBFIELD);*/
 		int bsf = (Integer)edge.get(BFConstants.EDGENUMBERSRC);
@@ -76,7 +77,7 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 
 	}
 
-	private void drawBondsite(Graphics2D g, Font m_font, Rectangle2D itembounds,
+	private void drawBondsite(Graphics2D g, Font font, Rectangle2D itembounds,
 			int textColor, String text) {
 		boolean useInt = 1.5 > Math.max(g.getTransform().getScaleX(),
 				g.getTransform().getScaleY());
@@ -86,16 +87,16 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 		Point2D start = null, end = null;
 		start = m_tmpPoints[1];
 		end   = m_tmpPoints[0];
-		FontMetrics fm = DEFAULT_GRAPHICS.getFontMetrics(m_font);
-		Dimension m_textDim = new Dimension();
-		m_textDim.width = fm.stringWidth(text);
-		m_textDim.height = fm.getHeight();
+		FontMetrics fm = DEFAULT_GRAPHICS.getFontMetrics(font);
+		Dimension textDim = new Dimension();
+		textDim.width = fm.stringWidth(text);
+		textDim.height = fm.getHeight();
 
 		Rectangle2D bounds = (Rectangle2D) itembounds.clone();
 
 		// Increase size of box to counter that text is defined from the bottom left corner
-		bounds.setRect(bounds.getX()-m_textDim.width, bounds.getY()-ypadding,
-				bounds.getWidth()+m_textDim.width+xpadding, bounds.getHeight()+m_textDim.height/2+ypadding);
+		bounds.setRect(bounds.getX()-textDim.width, bounds.getY()-ypadding,
+				bounds.getWidth()+textDim.width+xpadding, bounds.getHeight()+textDim.height/2d+ypadding);
 
 
 
@@ -115,20 +116,20 @@ public class BlobEdgeRenderer extends EdgeRenderer {
 
 		if ( text != null && ColorLib.alpha(textColor) > 0 ) {
 			g.setPaint(ColorLib.getColor(textColor));
-			g.setFont(m_font);
+			g.setFont(font);
 
-			
+
 			//double th = m_textDim.height;
 			// compute starting y-coordinate
 			/*y += fm.getAscent();
 			y += th - m_textDim.height;*/
-			drawString(g, fm, text, useInt, x, y, m_textDim.width);
+			drawString(g, text, useInt, x, y);
 
 		}
 	}
 
-	private final void drawString(Graphics2D g, FontMetrics fm, String text,
-			boolean useInt, double x, double y, double w)
+	private void drawString(Graphics2D g,  String text,
+			boolean useInt, double x, double y)
 	{
 		// compute the x-coordinate
 		double tx = x; //+ (w - fm.stringWidth(text)) / 2;

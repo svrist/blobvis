@@ -8,6 +8,10 @@
   <name>blobvis</name>
   <url>http://maven.apache.org</url>
 
+    <properties>
+          <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+   </properties>
+
   <build>
     <plugins>
       <plugin>
@@ -59,18 +63,29 @@
 
 
   </build>
+
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>jxr-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </reporting>
+
   <dependencies>
     <dependency>
-    <groupId>com.miglayout</groupId>
-    <artifactId>miglayout</artifactId>
-    <version>3.7.3</version>
-    <classifier>swing</classifier>
-  </dependency>
+      <groupId>com.miglayout</groupId>
+      <artifactId>miglayout</artifactId>
+      <version>3.7.3</version>
+      <classifier>swing</classifier>
+    </dependency>
     <dependency>
       <groupId >junit</groupId>
       <artifactId>junit</artifactId>
       <version>3.8.1</version>
-      <scope>test</scope>
+        <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dk.diku.blob</groupId>

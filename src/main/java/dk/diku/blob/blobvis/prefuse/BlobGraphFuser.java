@@ -15,8 +15,8 @@ import prefuse.data.Node;
 import prefuse.data.Tuple;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
-import dk.diku.blob.blobvis.gui.Progressable;
 import dk.diku.blob.blobvis.prefuse.operations.Operation;
+import dk.diku.blob.blobvis.util.Progressable;
 
 public class BlobGraphFuser implements BlobFuser {
 
@@ -31,7 +31,7 @@ public class BlobGraphFuser implements BlobFuser {
 	private Map<Integer, Blob> ntob;
 
 	public BlobGraphFuser() {
-		reset();
+		internalReset();
 		bton = new HashMap<Blob, Node>();
 		ntob = new HashMap<Integer, Blob>();
 	}
@@ -40,7 +40,11 @@ public class BlobGraphFuser implements BlobFuser {
 		getModel().readConfiguration(filename);
 	}
 
+
 	public void reset(){
+		internalReset();
+	}
+	private void internalReset(){
 		if (g!= null){ g.clear(); }
 		if (m != null){ m.reset(); }
 		setGraph(new Graph());
@@ -87,7 +91,7 @@ public class BlobGraphFuser implements BlobFuser {
 	public Node addBlobAsNode(Blob b,boolean inPgr) {
 		assert(getNode(b) == null);
 		if (getNode(b) != null){
-			throw new RuntimeException("Tried to add node that was there already: "+b);
+			throw new IllegalArgumentException("Tried to add node that was there already: "+b);
 		}
 		Node n = FuseUtil.addNode(getGraph(), b, inPgr);
 		// Internal bookkeeping of relations
@@ -129,7 +133,7 @@ public class BlobGraphFuser implements BlobFuser {
 	 */
 	public void populateGraphFromModelAPB(Progressable p) throws InterruptedException {
 		DFSBlob dfs = new DFSBlob(this, getModel().APB(),getModel().count());
-		dfs.p = p;
+		dfs.setProgressable(p);
 		runDFS(dfs);
 	}
 	public void populateGraphFromModelAPB() throws InterruptedException {
@@ -281,59 +285,54 @@ public class BlobGraphFuser implements BlobFuser {
 		thebug.set(BFConstants.EDGENUMBERTAR, 0);
 	}
 
-	private void stepModel(Blob apbcur, Blob apbnext) {
-		stepModel(getNode(apbcur),getNode(apbnext));
-	}
-	private void stepModel(Node node, Node nn) {
-		if (nn != null) {
-			saveRoot(nn);
-			getModel().step();
-			FuseUtil.setNodeApb(nn);
-		} else {
-			throw new RuntimeException("Failed to find the child successor");
-		}
+
+	private void stepModel(){
+		getModel().step();
+		Node n = getNode(apb());
+		saveRoot(n);
+		FuseUtil.setNodeApb(n);
 	}
 
-	private Blob APB() {
+	private Blob apb() {
 		return getModel().APB();
 	}
-	private Blob ADB() {
+	private Blob adb() {
 		return getModel().ADB();
 	}
 
 	public void step(){
 		StepResult result;
-		Operation o = Operation.parse(APB().opCode());
+		Operation o = Operation.parse(apb().opCode());
 		switch (o.type) {
 		case CHD:
-			result = doCHD(APB(), ADB());
+			result = doCHD(apb(), adb());
 			break;
 		case SCG:
 		case DBS:
-			result = new StepResult(APB(), ADB()).reread(true);
+			result = new StepResult(apb(), adb()).reread(true);
 			break;
 		case JB:
-			result = doJB(APB(), ADB());
+			result = doJB(apb(), adb());
 			break;
 		case SBS:
-			result = doSBS(APB(), ADB());
+			result = doSBS(apb(), adb());
 			break;
 		case JN:
-			result = doJN(APB(), ADB());
+			result = doJN(apb(), adb());
 			break;
 		case SWL:
-			result = doSWL(APB(), ADB());
+			result = doSWL(apb(), adb());
 			break;
 		case JCG:
-			result = doJCG(APB(), ADB());
+			result = doJCG(apb(), adb());
 			break;
 		case INS:
-			result = doINS(APB(),ADB(),o);
+			result = doINS(apb(),adb(),o);
 			break;
 		case FIN:
 			// do default action.
 		default:
-			result = new StepResult(APB(), ADB()); // Default action
+			result = new StepResult(apb(), adb()); // Default action
 			break;
 		}
 		execute(result);
@@ -341,16 +340,13 @@ public class BlobGraphFuser implements BlobFuser {
 
 	private StepResult doINS(Blob apb, Blob adb,Operation o) {
 		StepResult result =  new StepResult(apb, adb).nostep(true);
-		System.out.println(o.args.get(0));
-		System.out.println(o.args.get(0));
-		System.out.println(Integer.parseInt(o.args.get(0)));
 		BondSite b = BondSite.create(Integer.parseInt(o.args.get(0)));
 		Blob oldBlob = adb.follow(b);
 
 
 		// as result has nostep=true, we need to do the step
 		// our selves.
-		stepModel(result.adbcur,result.adbnext);
+		stepModel();
 		// this corrosponds to some kind of advice in aspect orient.
 		Blob newBlob = adb.follow(b);
 		addBlobAsNode(newBlob, false);
@@ -371,9 +367,9 @@ public class BlobGraphFuser implements BlobFuser {
 		updateTheBug(n, nn, getNode(sr.adbcur),
 				getNode(sr.adbnext));
 		if (!sr.nostep){
-			stepModel(n, nn);
+			stepModel();
 		}
-		if (sr.reread_cargo){
+		if (sr.rereadCargo){
 			rereadCargo(sr.adbnext);
 		}
 	}

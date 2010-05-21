@@ -9,9 +9,9 @@ import dk.diku.blob.blobvis.util.Task;
 final class ReadBlobConfigTask extends Task {
 	private final String filename;
 
-	BlobGraphFuser bgf;
+	private BlobGraphFuser bgf;
 
-	ReadBlobConfigTask(String filename, BlobGraphFuser bgf) {
+	public ReadBlobConfigTask(String filename, BlobGraphFuser bgf) {
 		this.filename = filename;
 		this.bgf = bgf;
 	}
@@ -38,7 +38,6 @@ final class ReadBlobConfigTask extends Task {
 
 	@Override
 	public void done() {
-		System.out.println("Done");
 		setProgress(100);
 	}
 }

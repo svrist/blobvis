@@ -8,6 +8,12 @@ import prefuse.data.Node;
 
 public class FuseUtil {
 
+
+	private FuseUtil(){
+
+	}
+
+
 	/*private static void addEdge(Graph g, Node n1, Blob b1, BondSite bs1,
 			Node n2, Blob b2) {
 		if (n2 != null) {
@@ -18,13 +24,11 @@ public class FuseUtil {
 
 	static void addEdge(Graph g, Node n1, Blob b1, BondSite bs1,
 			Node n2, Blob b2, BondSite bs2) {
-		if (n2 != null) {
-			if (g.getEdge(n2, n1) == null) {
-				Edge e = g.addEdge(n1, n2);
-				e.set(BFConstants.EDGENUMBERSRC, bs1.ordinal());
-				if (bs2 != null) {
-					e.set(BFConstants.EDGENUMBERTAR, bs2.ordinal());
-				}
+		if (n2 != null && g.getEdge(n2, n1) == null) {
+			Edge e = g.addEdge(n1, n2);
+			e.set(BFConstants.EDGENUMBERSRC, bs1.ordinal());
+			if (bs2 != null) {
+				e.set(BFConstants.EDGENUMBERTAR, bs2.ordinal());
 			}
 		}
 	}
@@ -35,7 +39,7 @@ public class FuseUtil {
 			BondSite bs2 = b2.boundTo(b1);
 			addEdge(g, n1, b1, bs1, n2, b2, bs2);
 		}else{
-			throw new NullPointerException("N2 argument is null (n1:"+n1+")");
+			throw new IllegalArgumentException("N2 argument is null (n1:"+n1+")");
 		}
 	}
 
@@ -111,11 +115,9 @@ public class FuseUtil {
 		}
 		if (!keepSuperFlouous){
 			if (g.getDegree(n1) == 0){
-				System.out.println(n1+" went superflous. Removing");
 				g.removeNode(n1);
 			}
 			if (g.getDegree(n2) == 0){
-				System.out.println(n2+" went superflous. Removing");
 				g.removeNode(n2);
 			}
 		}

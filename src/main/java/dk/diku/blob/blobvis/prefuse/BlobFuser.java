@@ -4,8 +4,7 @@ import model.Blob;
 import prefuse.data.Node;
 
 public interface BlobFuser {
-
-	public abstract void addEdge(Blob b1, Blob b2);
+	void addEdge(Blob b1, Blob b2);
 
 	/**
 	 * Add a blob to the prefuse graph.
@@ -14,6 +13,6 @@ public interface BlobFuser {
 	 * @param inPgr indicates if this is a program blob or data blob.
 	 * @return
 	 */
-	public abstract Node addBlobAsNode(Blob b, boolean inPgr);
+	Node addBlobAsNode(Blob b, boolean inPgr);
 
 }

@@ -5,7 +5,6 @@ package dk.diku.blob.blobvis.util;
 
 import javax.swing.SwingWorker;
 
-import dk.diku.blob.blobvis.gui.Progressable;
 
 public abstract class Task extends SwingWorker<Void, Void> implements Progressable {
 	/*

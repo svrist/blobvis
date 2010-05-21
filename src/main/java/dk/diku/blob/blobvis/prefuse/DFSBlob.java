@@ -11,8 +11,8 @@ import java.util.Stack;
 
 import model.Blob;
 import model.BondSite;
-import dk.diku.blob.blobvis.gui.Progressable;
 import dk.diku.blob.blobvis.util.Pair;
+import dk.diku.blob.blobvis.util.Progressable;
 
 class DFSBlob {
 
@@ -25,7 +25,7 @@ class DFSBlob {
 
 	private double mcount = -1;
 	private int count = 0;
-	Progressable p = new Progressable() {
+	private Progressable p = new Progressable() {
 		@Override
 		public void progress(int progress) {/* ignore */
 		}
@@ -57,12 +57,12 @@ class DFSBlob {
 	}
 
 	public void run() throws InterruptedException {
-		it_dfsBlob(start);
+		iterativeDfsBlobTraverse(start);
 
 
 	}
 
-	private void it_dfsBlob(Blob start) throws InterruptedException {
+	private void iterativeDfsBlobTraverse(Blob start) throws InterruptedException {
 		Stack<Pair<Blob,Boolean>> nextStack = new Stack<Pair<Blob,Boolean>>();
 		Stack<Blob> traversed = new Stack<Blob>();
 		Map<Blob, List<Blob>> edges = new HashMap<Blob, List<Blob>>();
@@ -122,5 +122,10 @@ class DFSBlob {
 			}
 		}
 		return viaNorth;
+	}
+
+	public void setProgressable(Progressable p) {
+		this.p = p;
+
 	}
 }

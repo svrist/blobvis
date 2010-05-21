@@ -27,10 +27,10 @@ import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
 
 public class AddGridData {
 	public int countNodes =0;
-	public int cardinality = 0;
+
 	public boolean randomData = true;
 	public boolean randomBs = true;
-	public boolean randomCardinality = true;
+
 	public BondSite out;
 	public BondSite in;
 
@@ -56,7 +56,7 @@ public class AddGridData {
 
 	public static void showAddBlobGridDialog(Component c, BlobGraphFuser bgf, VisualItem item) {
 		Blob b = bgf.getBlob(item);
-		AddGridData agd = getAddGridData(c,b);
+		AddGridData agd = getAddGridData(c);
 		List<Blob> work = new ArrayList<Blob>();
 		work.add(b);
 
@@ -64,19 +64,18 @@ public class AddGridData {
 			int count = agd.countNodes;
 			while (count > 0 && !work.isEmpty()) {
 				Blob cur = work.remove(0);
-				System.out.println("Adding to "+cur);
+
 				List<BondSite> freeBs = Blob.emptyBondSites(cur);
 				freeBs.remove(BondSite.North);
 				if (freeBs.size()>0){
 					int card = randGen.nextInt(freeBs.size())+1;
-					System.out.println("Chose to add "+card+" blobs");
+
 					Collections.shuffle(freeBs);
 					List<BondSite> newsites = new ArrayList<BondSite>(freeBs
 							.subList(0, card));
 					for (BondSite bs : newsites) {
 						Blob newb = bgf.addDataBlobToBondSite(cur, bs,
 								randomBs(false), randomCargo());
-						System.out.println(bs);
 						work.add(newb);
 						count--;
 					}
@@ -88,7 +87,7 @@ public class AddGridData {
 		}
 	}
 
-	private static AddGridData getAddGridData(Component c,Blob blob) {
+	private static AddGridData getAddGridData(Component c) {
 
 		final AddGridData agd = new AddGridData();
 
@@ -132,7 +131,6 @@ public class AddGridData {
 				numformat);
 		ActionListener okAction = new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				System.out.println("OkAction");
 				agd.countNodes = (Integer) numberinput.getValue();
 				dialog.setVisible(false);
 			}

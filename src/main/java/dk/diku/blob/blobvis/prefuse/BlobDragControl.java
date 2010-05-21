@@ -9,6 +9,7 @@ import javax.swing.SwingUtilities;
 import prefuse.Display;
 import prefuse.controls.ControlAdapter;
 import prefuse.visual.VisualItem;
+import dk.diku.blob.blobvis.BlobVis;
 
 /**
  * Interactive drag control that is "aggregate-aware"
@@ -58,15 +59,17 @@ public class BlobDragControl extends ControlAdapter {
 	 */
 	@Override
 	public void itemPressed(VisualItem item, MouseEvent e) {
-		if (!SwingUtilities.isLeftMouseButton(e)) return;
+		if (!SwingUtilities.isLeftMouseButton(e)) {
+			return;
+		}
 		dragged = false;
 		Display d = (Display)e.getComponent();
 		d.getAbsoluteCoordinate(e.getPoint(), down);
 		/*if ( item instanceof AggregateItem )
 			setFixed(item, true);*/
-		paused=!item.getVisualization().getAction("force").isRunning();
-		item.getVisualization().cancel("force");
-		item.getVisualization().run("force");
+		paused=!item.getVisualization().getAction(BlobVis.ACTION_FORCE).isRunning();
+		item.getVisualization().cancel(BlobVis.ACTION_FORCE);
+		item.getVisualization().run(BlobVis.ACTION_FORCE);
 
 	}
 
@@ -75,14 +78,17 @@ public class BlobDragControl extends ControlAdapter {
 	 */
 	@Override
 	public void itemReleased(VisualItem item, MouseEvent e) {
-		if (!SwingUtilities.isLeftMouseButton(e)) return;
+		if (!SwingUtilities.isLeftMouseButton(e)) {
+			return;
+		}
 		if ( dragged ) {
 			activeItem = null;
 			setFixed(item, false);
 			dragged = false;
 		}
-		if (paused)
-			item.getVisualization().cancel("force");
+		if (paused) {
+			item.getVisualization().cancel(BlobVis.ACTION_FORCE);
+		}
 
 
 	}
@@ -92,7 +98,9 @@ public class BlobDragControl extends ControlAdapter {
 	 */
 	@Override
 	public void itemDragged(VisualItem item, MouseEvent e) {
-		if (!SwingUtilities.isLeftMouseButton(e)) return;
+		if (!SwingUtilities.isLeftMouseButton(e)) {
+			return;
+		}
 		dragged = true;
 		Display d = (Display)e.getComponent();
 		d.getAbsoluteCoordinate(e.getPoint(), temp);

@@ -54,17 +54,12 @@ public class AddBlobDialog {
 		+ ", ok=" + ok + ", toBs=" + toBs + "]";
 	}
 
-	private static AddBlobDialog getAddBlobData(Component c,Blob b) {
+	private static AddBlobDialog getAddBlobData(Component comp,Blob b) {
 		final AddBlobDialog abd = new AddBlobDialog();
 		abd.ok = false;
-		final List<BsListItem> possibleFrom = new ArrayList<BsListItem>();
-		final List<BsListItem> possibleTo = new ArrayList<BsListItem>();
-
 		// -- build the dialog -----
 		// we need to get the enclosing frame first
-		while (c != null && !(c instanceof JFrame)) {
-			c = c.getParent();
-		}
+		Component c = getJFrame(comp);
 		final JDialog dialog = new JDialog((JFrame) c, "Add new Blob", true);
 
 		// create the ok/cancel buttons
@@ -75,37 +70,22 @@ public class AddBlobDialog {
 			public void actionPerformed(ActionEvent e) {
 				abd.ok = false;
 				dialog.setVisible(false);
-				System.out.println("Adbok " + abd.ok);
 			}
 		});
 
 		// build the selection list
-		int selindx = 0; // Default north
-		int foundc = 0;
-		for (int i = 0; i < 4; i++) {
-			BsListItem bsi = new BsListItem(BondSite.create(i));
-			if (b.follow(bsi.bs) == null) {
-				possibleFrom.add(bsi);
-				if (i > 0 && selindx == 0) {
-					selindx = foundc;
-				}
-				foundc++;
-			}
-		}
-		if (possibleFrom.size() == 0) {
+		final List<BsListItem> possibleFrom = getPossibleFromBondSites(b);
+		if (possibleFrom.isEmpty()) {
 			JOptionPane.showMessageDialog(c,
 					"This data blob has no free BondSites", "Error",
 					JOptionPane.ERROR_MESSAGE);
 			abd.ok = false;
 			return abd;
 		}
-		for (int i = 0; i < 4; i++) {
-			BsListItem bsi = new BsListItem(BondSite.create(i));
-			possibleTo.add(bsi);
-		}
+		final List<BsListItem> possibleTo = getPossibleToBondSites();
 
 		final JComboBox fromlist = new JComboBox(possibleFrom.toArray());
-		fromlist.setSelectedIndex(selindx);
+		fromlist.setSelectedIndex(0);
 		abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).bs;
 		final JComboBox tolist = new JComboBox(possibleTo.toArray());
 		tolist.setSelectedIndex(1);
@@ -128,7 +108,6 @@ public class AddBlobDialog {
 				if (sel >= 0) {
 					ok.setEnabled(true);
 					BsListItem bsi = (BsListItem) tolist.getSelectedItem();
-					// System.out.println(bsi+" : "+abd);
 					abd.toBs = bsi.bs;
 				} else {
 					ok.setEnabled(false);
@@ -138,21 +117,9 @@ public class AddBlobDialog {
 		});
 
 		// layout the buttons
-		Box bbox = new Box(BoxLayout.X_AXIS);
-		bbox.add(Box.createHorizontalStrut(5));
-		bbox.add(Box.createHorizontalGlue());
-		bbox.add(ok);
-		bbox.add(Box.createHorizontalStrut(5));
-		bbox.add(cancel);
-		bbox.add(Box.createHorizontalStrut(5));
+		Box bbox = getButtons(ok, cancel);
 
-		NumberFormatter numformat = new NumberFormatter(NumberFormat
-				.getIntegerInstance());
-		numformat.setMinimum(0);
-		numformat.setMaximum(127);
-		final JFormattedTextField cargoinput = new JFormattedTextField(
-				numformat);
-		cargoinput.setValue(b.getCargo());
+		final JFormattedTextField cargoinput = getNumberTextField(b.getCargo(),0,127);
 
 		ok.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -169,6 +136,31 @@ public class AddBlobDialog {
 		bbox2.add(cargoinput);
 
 		// put everything into a panel
+		JPanel panel = getMainLayout(fromlist, tolist, bbox, cargoinput);
+
+		// show the dialog
+		dialog.setContentPane(panel);
+		dialog.pack();
+		dialog.setLocationRelativeTo(c);
+		dialog.setVisible(true);
+		dialog.dispose();
+
+
+
+		return abd;
+	}
+
+	private static Component getJFrame(Component comp) {
+		Component c = comp;
+		while (c != null && !(c instanceof JFrame)) {
+			c = c.getParent();
+		}
+		return c;
+	}
+
+	private static JPanel getMainLayout(final JComboBox fromlist,
+			final JComboBox tolist, Box bbox,
+			final JFormattedTextField cargoinput) {
 		JPanel panel = new JPanel(new MigLayout());
 		panel.add(new JLabel("From Bondsite:"));
 
@@ -181,17 +173,49 @@ public class AddBlobDialog {
 		panel.add(cargoinput, "wrap");
 		panel.add(bbox, "span, gapleft push,wrap");
 		panel.setBorder(BorderFactory.createTitledBorder("Blob data"));
+		return panel;
+	}
 
-		// show the dialog
-		dialog.setContentPane(panel);
-		dialog.pack();
-		dialog.setLocationRelativeTo(c);
-		dialog.setVisible(true);
-		dialog.dispose();
+	private static JFormattedTextField getNumberTextField(int defaultValue,int min, int max) {
+		NumberFormatter numformat = new NumberFormatter(NumberFormat
+				.getIntegerInstance());
+		numformat.setMinimum(min);
+		numformat.setMaximum(max);
+		final JFormattedTextField cargoinput = new JFormattedTextField(
+				numformat);
+		cargoinput.setValue(defaultValue);
+		return cargoinput;
+	}
 
+	private static Box getButtons(final JButton ok, JButton cancel) {
+		Box bbox = new Box(BoxLayout.X_AXIS);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(Box.createHorizontalGlue());
+		bbox.add(ok);
+		bbox.add(Box.createHorizontalStrut(5));
+		bbox.add(cancel);
+		bbox.add(Box.createHorizontalStrut(5));
+		return bbox;
+	}
 
+	private static List<BsListItem> getPossibleToBondSites() {
+		final List<BsListItem> possibleTo = new ArrayList<BsListItem>();
+		for (BondSite bs : BondSite.asList()) {
+			BsListItem bsi = new BsListItem(bs);
+			possibleTo.add(bsi);
+		}
+		return possibleTo;
+	}
 
-		return abd;
+	private static List<BsListItem> getPossibleFromBondSites(Blob b) {
+		final List<BsListItem> possibleFrom = new ArrayList<BsListItem>();
+		for (BondSite bs : Blob.emptyBondSites(b)) {
+			BsListItem bsi = new BsListItem(bs);
+			if (bs != BondSite.North) {
+				possibleFrom.add(bsi);
+			}
+		}
+		return possibleFrom;
 	}
 
 	public static void showDialogAndPerformAdd(Component c, BlobGraphFuser bgf,VisualItem item) {
