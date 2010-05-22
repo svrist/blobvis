@@ -374,7 +374,10 @@ public class BlobVis extends JPanel {
 		slider.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
 				filter.setDistance(slider.getValue().intValue());
-				m_vis.run(ACTION_BASEPAUSED);
+				if (!m_vis.getAction(ACTION_FORCE).isRunning()){
+					m_vis.cancel(ACTION_1SFORCE);
+					m_vis.run(ACTION_1SFORCE);
+				}
 			}
 		});
 
@@ -794,6 +797,8 @@ public class BlobVis extends JPanel {
 		JMenuBar menubar = new JMenuBar();
 		menubar.add(setupFileMenu(ad));
 		menubar.add(setupDataMenu());
+		menubar.add(setupSettingsMenu(ad));
+
 		frame.setJMenuBar(menubar);
 
 		frame.setExtendedState(Frame.MAXIMIZED_HORIZ);
@@ -805,6 +810,23 @@ public class BlobVis extends JPanel {
 		frame.setVisible(true);
 		ad.readData(filename);
 		return frame;
+	}
+
+	private static JMenu setupSettingsMenu(final BlobVis ad) {
+		JMenu setMenu = new JMenu("Settings");
+		setMenu.add("Force Simulation settings...");
+		JCheckBoxMenuItem cbGrayItem;
+		cbGrayItem = new JCheckBoxMenuItem("GrayScale colors");
+		cbGrayItem.setMnemonic('g');
+		cbGrayItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
+		cbGrayItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				ad.toggleGrayscale();
+			}
+		});
+		setMenu.add(cbGrayItem);
+		return setMenu;
 	}
 
 	/**
@@ -847,7 +869,7 @@ public class BlobVis extends JPanel {
 		// a group of check box menu items
 		fileMenu.addSeparator();
 
-		fileMenu.add("Preferences");
+
 
 		// Show debug information, copied from prefuse to be included in my
 		// menu instead of only as keyboard shortcut.
@@ -873,17 +895,7 @@ public class BlobVis extends JPanel {
 
 
 
-		JCheckBoxMenuItem cbGrayItem;
-		cbGrayItem = new JCheckBoxMenuItem("GrayScale");
-		cbGrayItem.setMnemonic('g');
-		cbGrayItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
-		cbGrayItem.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				ad.toggleGrayscale();
-			}
-		});
-		fileMenu.add(cbGrayItem);
+
 		fileMenu.addSeparator();
 
 		JMenuItem exitItem = new JMenuItem("Exit");
