@@ -81,7 +81,7 @@ public class BlobVis extends JPanel {
 
 	private static final String ACTION_PLAY = "play";
 
-	private static final String ACTION_1SFORCE = "1sforce";
+	public static final String ACTION_1SFORCE = "1sforce";
 
 	public static final String ACTION_FORCE = "force";
 
@@ -339,8 +339,8 @@ public class BlobVis extends JPanel {
 		zoomButtons.add(zoomMinus);
 
 		JButton zoomFit = new JButton("[]");
+		zoomFit.setToolTipText("Zoom Fit to screen");
 		zoomFit.addActionListener(new ActionListener() {
-
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				long duration = 2000;
@@ -832,11 +832,6 @@ public class BlobVis extends JPanel {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				ad.readData(null);
-				/*String filename = getBlobConfigFilename(ad,prefs);
-				if (filename == null) {
-					return;
-				}
-				ad.readProgramAndDataAsGraph(filename);*/
 			}
 		});
 
@@ -851,6 +846,8 @@ public class BlobVis extends JPanel {
 
 		// a group of check box menu items
 		fileMenu.addSeparator();
+
+		fileMenu.add("Preferences");
 
 		// Show debug information, copied from prefuse to be included in my
 		// menu instead of only as keyboard shortcut.
@@ -873,6 +870,8 @@ public class BlobVis extends JPanel {
 			}
 		});
 		fileMenu.add(cbMenuItem);
+
+
 
 		JCheckBoxMenuItem cbGrayItem;
 		cbGrayItem = new JCheckBoxMenuItem("GrayScale");
