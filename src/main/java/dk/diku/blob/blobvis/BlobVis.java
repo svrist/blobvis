@@ -2,6 +2,7 @@ package dk.diku.blob.blobvis;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -32,6 +33,7 @@ import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
 import javax.swing.ProgressMonitor;
+import javax.swing.UIManager;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -63,6 +65,7 @@ import prefuse.util.display.DebugStatsPainter;
 import prefuse.util.display.DisplayLib;
 import prefuse.util.display.ExportDisplayAction;
 import prefuse.util.display.PaintListener;
+import prefuse.util.ui.JForcePanel;
 import prefuse.util.ui.JValueSlider;
 import prefuse.util.ui.UILib;
 import prefuse.visual.VisualGraph;
@@ -77,6 +80,7 @@ import dk.diku.blob.blobvis.prefuse.StepResult;
 
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
+	private static final String PREFS_LAST_HOPS = "LAST_HOPS";
 	private static final String ACTION_BASEPAUSED = "basepaused";
 	private static final String ACTION_PLAY = "play";
 	public static final String ACTION_1SFORCE = "1sforce";
@@ -91,6 +95,7 @@ public class BlobVis extends JPanel {
 	private static final String GRAPH = "graph";
 	private static final String EDGES = "graph.edges";
 	private static final String NODES = "graph.nodes";
+	private static final int DEFAULT_HOPS = 10;
 
 	// Prefuse layers
 	private Visualization mvis;
@@ -99,7 +104,7 @@ public class BlobVis extends JPanel {
 	private VisualGraph vg;
 
 	// defaults
-	private int hops = 5;
+	private int hops;
 
 	// Shared filter.
 	private final GraphDistanceFilter filter;
@@ -124,6 +129,7 @@ public class BlobVis extends JPanel {
 	private ActionList colorsetup;
 
 	private StepModelAction stepModelAction;
+	private ForceDirectedLayout forceLayout;
 
 	private final class ProgressListener implements
 	PropertyChangeListener {
@@ -234,6 +240,9 @@ public class BlobVis extends JPanel {
 		bgf = new BlobGraphModel();
 
 		mvis = new Visualization();
+
+		hops = prefs.getInt(PREFS_LAST_HOPS, DEFAULT_HOPS);
+
 		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
 		// init base components.
 		setupRenderer();
@@ -369,9 +378,15 @@ public class BlobVis extends JPanel {
 	}
 
 	private Box setupSlider() {
+		Color c = UIManager.getLookAndFeel().getDefaults().getColor("Panel.background");
+		slider.setBackground(c);
+
 		slider.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
-				filter.setDistance(slider.getValue().intValue());
+				int sliderHops = slider.getValue().intValue();
+				filter.setDistance(sliderHops);
+				prefs.putInt(PREFS_LAST_HOPS,sliderHops);
+
 				if (!mvis.getAction(ACTION_FORCE).isRunning()){
 					mvis.cancel(ACTION_1SFORCE);
 					mvis.run(ACTION_1SFORCE);
@@ -471,6 +486,8 @@ public class BlobVis extends JPanel {
 		// now create the main layout routine
 		ActionList init = new ActionList();
 
+		forceLayout = new ForceDirectedLayout(GRAPH);
+
 		init.add(filter);
 		colorsetup = getColorSetup(grayScale);
 		init.add(colorsetup);
@@ -481,7 +498,7 @@ public class BlobVis extends JPanel {
 		ActionList singleforce = new ActionList(1000);
 		singleforce.add(filter);
 		singleforce.add(colorsetup);
-		singleforce.add(new ForceDirectedLayout(GRAPH));
+		singleforce.add(forceLayout);
 		singleforce.add(new RepaintAction());
 		mvis.putAction(ACTION_1SFORCE, singleforce);
 
@@ -500,7 +517,7 @@ public class BlobVis extends JPanel {
 		ActionList force = new ActionList(Action.INFINITY, 32);
 		force.add(filter);
 		force.add(colorsetup);
-		force.add(new ForceDirectedLayout(GRAPH));
+		force.add(forceLayout);
 		// force.add(AggrForce());
 		force.add(new RepaintAction());
 
@@ -592,7 +609,7 @@ public class BlobVis extends JPanel {
 	}
 
 	private void toggleGrayscale() {
-		grayScale ^= grayScale;
+		grayScale ^= true;
 		colorsetup = getColorSetup(grayScale);
 
 
@@ -795,7 +812,7 @@ public class BlobVis extends JPanel {
 		final BlobVis ad = new BlobVis();
 		JMenuBar menubar = new JMenuBar();
 		menubar.add(setupFileMenu(ad));
-		menubar.add(setupDataMenu());
+		//		menubar.add(setupDataMenu());
 		menubar.add(setupSettingsMenu(ad));
 
 		frame.setJMenuBar(menubar);
@@ -813,7 +830,14 @@ public class BlobVis extends JPanel {
 
 	private static JMenu setupSettingsMenu(final BlobVis ad) {
 		JMenu setMenu = new JMenu("Settings");
-		setMenu.add("Force Simulation settings...");
+		JMenuItem forceSet = new JMenuItem("Force-simulation settings...");
+		forceSet.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JForcePanel.showForcePanel(ad.forceLayout.getForceSimulator());
+			}
+		});
+		setMenu.add(forceSet);
 		JCheckBoxMenuItem cbGrayItem;
 		cbGrayItem = new JCheckBoxMenuItem("GrayScale colors");
 		cbGrayItem.setMnemonic('g');
@@ -821,6 +845,7 @@ public class BlobVis extends JPanel {
 		cbGrayItem.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
+				System.out.println("Toggle Gray");
 				ad.toggleGrayscale();
 			}
 		});
