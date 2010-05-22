@@ -87,15 +87,13 @@ public class AddGridData {
 		}
 	}
 
-	private static AddGridData getAddGridData(Component c) {
+	private static AddGridData getAddGridData(Component comp) {
 
 		final AddGridData agd = new AddGridData();
 
 		// -- build the dialog -----
 		// we need to get the enclosing frame first
-		while (c != null && !(c instanceof JFrame)) {
-			c = c.getParent();
-		}
+		Component c = AddBlobDialog.getJFrame(comp);
 		final JDialog dialog = new JDialog((JFrame) c, "Add new random Blobs", true);
 
 		// create the ok/cancel buttons

@@ -31,22 +31,26 @@ import dk.diku.blob.blobvis.prefuse.BlobGraphFuser;
 
 public class AddBlobDialog {
 	public static class BsListItem {
-		public BsListItem(BondSite bs) {
-			this.bs = bs;
+		public BsListItem(BondSite bondsite) {
+			this.bondsite = bondsite;
 		}
 
-		public BondSite bs;
+		private BondSite bondsite;
 
 		@Override
 		public String toString() {
-			return bs.ordinal() + " : " + bs.toString();
+			return bondsite.ordinal() + " : " + bondsite.toString();
+		}
+
+		public BondSite getBondsite() {
+			return bondsite;
 		}
 	}
 
-	public BondSite fromBs;
-	public BondSite toBs;
-	public int cargo;
-	public boolean ok = true;
+	private BondSite fromBs;
+	private BondSite toBs;
+	private int cargo;
+	private boolean ok = true;
 
 	@Override
 	public String toString() {
@@ -54,13 +58,13 @@ public class AddBlobDialog {
 		+ ", ok=" + ok + ", toBs=" + toBs + "]";
 	}
 
-	private static AddBlobDialog getAddBlobData(Component comp,Blob b) {
+	private static AddBlobDialog getAddBlobData(Component comp,Blob blob) {
 		final AddBlobDialog abd = new AddBlobDialog();
 		abd.ok = false;
 		// -- build the dialog -----
 		// we need to get the enclosing frame first
-		Component c = getJFrame(comp);
-		final JDialog dialog = new JDialog((JFrame) c, "Add new Blob", true);
+		Component component = getJFrame(comp);
+		final JDialog dialog = new JDialog((JFrame) component, "Add new Blob", true);
 
 		// create the ok/cancel buttons
 		final JButton ok = new JButton("OK");
@@ -74,31 +78,32 @@ public class AddBlobDialog {
 		});
 
 		// build the selection list
-		final List<BsListItem> possibleFrom = getPossibleFromBondSites(b);
+		final List<BsListItem> possibleFrom = getPossibleFromBondSites(blob);
 		if (possibleFrom.isEmpty()) {
-			JOptionPane.showMessageDialog(c,
+			JOptionPane.showMessageDialog(component,
 					"This data blob has no free BondSites", "Error",
 					JOptionPane.ERROR_MESSAGE);
 			abd.ok = false;
-			return abd;
+
+			return abd;	//NOPMD
 		}
 		final List<BsListItem> possibleTo = getPossibleToBondSites();
 
 		final JComboBox fromlist = new JComboBox(possibleFrom.toArray());
 		fromlist.setSelectedIndex(0);
-		abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).bs;
+		abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).getBondsite();
 		final JComboBox tolist = new JComboBox(possibleTo.toArray());
 		tolist.setSelectedIndex(1);
-		abd.toBs = ((BsListItem) tolist.getSelectedItem()).bs;
+		abd.toBs = ((BsListItem) tolist.getSelectedItem()).getBondsite();
 		fromlist.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				int sel = fromlist.getSelectedIndex();
 				if (sel >= 0) {
 					ok.setEnabled(true);
-					abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).bs;
+					abd.fromBs = ((BsListItem) fromlist.getSelectedItem()).getBondsite();
 				} else {
 					ok.setEnabled(false);
-					abd.fromBs = null;
+					abd.fromBs = null;//NOPMD
 				}
 			}
 		});
@@ -108,9 +113,10 @@ public class AddBlobDialog {
 				if (sel >= 0) {
 					ok.setEnabled(true);
 					BsListItem bsi = (BsListItem) tolist.getSelectedItem();
-					abd.toBs = bsi.bs;
+					abd.toBs = bsi.getBondsite();
 				} else {
 					ok.setEnabled(false);
+					//NOPMD
 					abd.toBs = null;
 				}
 			}
@@ -119,7 +125,7 @@ public class AddBlobDialog {
 		// layout the buttons
 		Box bbox = getButtons(ok, cancel);
 
-		final JFormattedTextField cargoinput = getNumberTextField(b.getCargo(),0,127);
+		final JFormattedTextField cargoinput = getNumberTextField(blob.getCargo(),0,127);
 
 		ok.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -141,7 +147,7 @@ public class AddBlobDialog {
 		// show the dialog
 		dialog.setContentPane(panel);
 		dialog.pack();
-		dialog.setLocationRelativeTo(c);
+		dialog.setLocationRelativeTo(component);
 		dialog.setVisible(true);
 		dialog.dispose();
 
@@ -150,7 +156,7 @@ public class AddBlobDialog {
 		return abd;
 	}
 
-	private static Component getJFrame(Component comp) {
+	static Component getJFrame(Component comp) {
 		Component c = comp;
 		while (c != null && !(c instanceof JFrame)) {
 			c = c.getParent();
@@ -224,6 +230,20 @@ public class AddBlobDialog {
 		if (abd.ok) {
 			bgf.addDataBlobToBondSite(item, abd.fromBs, abd.toBs, abd.cargo);
 		}
+	}
+
+	public BondSite getFromBs() {
+		return fromBs;
+	}
+
+	public BondSite getToBs() {
+		return toBs;
+	}
+	public int getCargo() {
+		return cargo;
+	}
+	public boolean isOk() {
+		return ok;
 	}
 
 }

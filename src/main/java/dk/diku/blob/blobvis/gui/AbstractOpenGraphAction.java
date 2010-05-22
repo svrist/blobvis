@@ -13,10 +13,11 @@ import javax.swing.KeyStroke;
 
 import prefuse.util.io.SimpleFileFilter;
 
-public abstract class OpenGraphAction extends AbstractAction {
+public abstract class AbstractOpenGraphAction extends AbstractAction {
 	private static final long serialVersionUID = 1L;
 
-	public OpenGraphAction(Preferences prefs) {
+	public AbstractOpenGraphAction() {
+		super();
 		putValue(AbstractAction.NAME, "Open File...");
 		putValue(AbstractAction.ACCELERATOR_KEY, KeyStroke
 				.getKeyStroke("ctrl O"));

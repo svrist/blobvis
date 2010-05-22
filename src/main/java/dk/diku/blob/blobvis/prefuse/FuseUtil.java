@@ -6,7 +6,7 @@ import prefuse.data.Edge;
 import prefuse.data.Graph;
 import prefuse.data.Node;
 
-public class FuseUtil {
+public final class FuseUtil {
 
 
 	private FuseUtil(){

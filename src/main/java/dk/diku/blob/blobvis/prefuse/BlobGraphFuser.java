@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import model.Blob;
 import model.BondSite;
@@ -196,7 +197,7 @@ public class BlobGraphFuser implements BlobFuser {
 	public Blob getBlob(Tuple item) {
 		Blob ret = ntob.get(item.getRow());
 		if (ret == null){
-			throw new NullPointerException("Failed to find "+item+" in the blobGraphFuser libraries");
+			throw new NoSuchElementException("Failed to find "+item+" in the blobGraphFuser libraries");
 		}
 		return ret;
 	}
@@ -383,15 +384,15 @@ public class BlobGraphFuser implements BlobFuser {
 
 		Blob adb_b1 = adb.follow(b1);
 		Node adb_b1n = null;
-		BondSite ts2 = null;
+		BondSite ts2= null;
 		if (adb_b1 != null) {
 			ts2 = adb_b1.boundTo(adb);
 			adb_b1n = getNode(adb_b1);
 		}
 		Blob adb_b2 = adb.follow(b2);
-		Blob adb_b2_b1 = null;
+
 		if (adb_b2 != null) {
-			adb_b2_b1 = adb_b2.follow(b1);
+			Blob adb_b2_b1 = adb_b2.follow(b1);
 			Node adb_b2n = getNode(adb_b2);
 			if (adb_b2_b1 != null) {
 				BondSite ts1 = adb_b2_b1.boundTo(adb_b2);
@@ -502,7 +503,7 @@ public class BlobGraphFuser implements BlobFuser {
 		return result;
 	}
 
-	public void setModel(Model m) {
+	private void setModel(Model m) {
 		this.m = m;
 	}
 
@@ -510,7 +511,7 @@ public class BlobGraphFuser implements BlobFuser {
 		return m;
 	}
 
-	public void setGraph(Graph g) {
+	private void setGraph(Graph g) {
 		this.g = g;
 	}
 

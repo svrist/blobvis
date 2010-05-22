@@ -67,8 +67,8 @@ import prefuse.util.ui.JValueSlider;
 import prefuse.util.ui.UILib;
 import prefuse.visual.VisualGraph;
 import prefuse.visual.VisualItem;
+import dk.diku.blob.blobvis.gui.AbstractOpenGraphAction;
 import dk.diku.blob.blobvis.gui.DataBlobPopupMenu;
-import dk.diku.blob.blobvis.gui.OpenGraphAction;
 import dk.diku.blob.blobvis.prefuse.BFConstants;
 import dk.diku.blob.blobvis.prefuse.BlobDragControl;
 import dk.diku.blob.blobvis.prefuse.BlobEdgeRenderer;
@@ -78,11 +78,8 @@ import dk.diku.blob.blobvis.prefuse.StepResult;
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
 	private static final String ACTION_BASEPAUSED = "basepaused";
-
 	private static final String ACTION_PLAY = "play";
-
 	public static final String ACTION_1SFORCE = "1sforce";
-
 	public static final String ACTION_FORCE = "force";
 
 	private static Preferences prefs;
@@ -96,7 +93,7 @@ public class BlobVis extends JPanel {
 	private static final String NODES = "graph.nodes";
 
 	// Prefuse layers
-	private Visualization m_vis;
+	private Visualization mvis;
 	private Display display;
 	// private Graph g;
 	private VisualGraph vg;
@@ -130,12 +127,12 @@ public class BlobVis extends JPanel {
 
 	private final class ProgressListener implements
 	PropertyChangeListener {
-		private final ReadBlobConfigTask t;
+		private final ReadBlobConfigTask task;
 		private final String filename;
 		private boolean canceled = false;
 
-		private ProgressListener(ReadBlobConfigTask t, String filename) {
-			this.t = t;
+		private ProgressListener(ReadBlobConfigTask task, String filename) {
+			this.task = task;
 			this.filename = filename;
 		}
 
@@ -148,9 +145,9 @@ public class BlobVis extends JPanel {
 						progress);
 				progressMonitor.setNote(message);
 			}
-			if (progressMonitor.isCanceled() || t.isDone()) {
+			if (progressMonitor.isCanceled() || task.isDone()) {
 				if (progressMonitor.isCanceled()) {
-					t.cancel(true);
+					task.cancel(true);
 					progressMonitor.close();
 					canceled = true;
 				} else if (!canceled && ended ) {
@@ -197,7 +194,7 @@ public class BlobVis extends JPanel {
 	public class PauseForceAction implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			m_vis.cancel(ACTION_BASEPAUSED);
+			mvis.cancel(ACTION_BASEPAUSED);
 			toggleForce();
 		}
 	}
@@ -208,7 +205,7 @@ public class BlobVis extends JPanel {
 			// Make sure that all steps are finished before a new one is
 			// executed.
 
-			synchronized (m_vis) {
+			synchronized (mvis) {
 				// ensure that a force simulation is running during this
 				// operation.
 				tmpRunForce1s();
@@ -222,13 +219,13 @@ public class BlobVis extends JPanel {
 	}
 
 	public boolean isForcePaused() {
-		return !m_vis.getAction(ACTION_FORCE).isRunning();
+		return !mvis.getAction(ACTION_FORCE).isRunning();
 	}
 
 	private void tmpRunForce1s() {
 		if (isForcePaused()) {
-			m_vis.cancel(ACTION_1SFORCE);
-			m_vis.run(ACTION_1SFORCE);
+			mvis.cancel(ACTION_1SFORCE);
+			mvis.run(ACTION_1SFORCE);
 		}
 	}
 
@@ -236,7 +233,7 @@ public class BlobVis extends JPanel {
 		super(new BorderLayout());
 		bgf = new BlobGraphModel();
 
-		m_vis = new Visualization();
+		mvis = new Visualization();
 		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
 		// init base components.
 		setupRenderer();
@@ -251,7 +248,7 @@ public class BlobVis extends JPanel {
 		pause = new JButton("Pause force movements");
 		slider = new JValueSlider("Distance", 0, 35, hops);
 
-		Box boxpanel = setupBoxpanel();
+		Box boxpanel = setupBoxpanel(); //NOPMD
 		panel.add(boxpanel);
 		JSplitPane split = setupSplitPane(display, panel);
 		add(split);
@@ -269,7 +266,7 @@ public class BlobVis extends JPanel {
 				step.setEnabled(false);
 				tmpStopForce();
 
-				m_vis.run(ACTION_1SFORCE);
+				mvis.run(ACTION_1SFORCE);
 			}
 		});
 		bgf.registerStepListener(new ActionListener() {
@@ -278,17 +275,18 @@ public class BlobVis extends JPanel {
 				StepResult sr = (StepResult) e.getSource();
 				VisualItem vnn = (VisualItem) vg.getNode(bgf
 						.getNode(sr.apbnext).getRow());
-				m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
+				mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
 			}
 		});
 	}
 
 	private void readData(String filename) {
+		String f = filename;
 		if (filename == null || "".equals(filename)) {
-			filename = OpenGraphAction.getBlobConfigFilename(this, prefs);
+			f = AbstractOpenGraphAction.getBlobConfigFilename(this, prefs);
 		}
-		if (filename != null) {
-			readProgramAndDataAsGraph(filename);
+		if (f != null) {
+			readProgramAndDataAsGraph(f);
 		}
 	}
 
@@ -297,6 +295,7 @@ public class BlobVis extends JPanel {
 		private float direction = 1;
 
 		ZoomActionListener(float direction) {
+			super();
 			this.direction = direction;
 		}
 
@@ -341,11 +340,10 @@ public class BlobVis extends JPanel {
 		JButton zoomFit = new JButton("[]");
 		zoomFit.setToolTipText("Zoom Fit to screen");
 		zoomFit.addActionListener(new ActionListener() {
+			private long duration = 2000;
+			private int margin = 50;
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				long duration = 2000;
-				int margin = 50;
-
 				if (!display.isTranformInProgress()) {
 					Visualization vis = display.getVisualization();
 					Rectangle2D bounds = vis.getBounds(NODES);
@@ -374,9 +372,9 @@ public class BlobVis extends JPanel {
 		slider.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
 				filter.setDistance(slider.getValue().intValue());
-				if (!m_vis.getAction(ACTION_FORCE).isRunning()){
-					m_vis.cancel(ACTION_1SFORCE);
-					m_vis.run(ACTION_1SFORCE);
+				if (!mvis.getAction(ACTION_FORCE).isRunning()){
+					mvis.cancel(ACTION_1SFORCE);
+					mvis.run(ACTION_1SFORCE);
 				}
 			}
 		});
@@ -418,13 +416,13 @@ public class BlobVis extends JPanel {
 		play.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if (!ended && !m_vis.getAction(ACTION_PLAY).isRunning()) {
-					m_vis.cancel(ACTION_PLAY);
-					m_vis.run(ACTION_PLAY);
+				if (!ended && !mvis.getAction(ACTION_PLAY).isRunning()) {
+					mvis.cancel(ACTION_PLAY);
+					mvis.run(ACTION_PLAY);
 					play.setText("Stop program");
 				} else {
 					play.setText("Play program");
-					m_vis.cancel(ACTION_PLAY);
+					mvis.cancel(ACTION_PLAY);
 				}
 			}
 		});
@@ -449,7 +447,7 @@ public class BlobVis extends JPanel {
 
 	private void setupDisplay() {
 		// set up the display
-		display = new Display(m_vis);
+		display = new Display(mvis);
 		display.setSize(800, 800);
 		display.pan(400, 400);
 		display.setHighQuality(true);
@@ -466,7 +464,7 @@ public class BlobVis extends JPanel {
 		tr.setRoundedCorner(8, 8);
 		DefaultRendererFactory dfr = new DefaultRendererFactory(tr,
 				new BlobEdgeRenderer());
-		m_vis.setRendererFactory(dfr);
+		mvis.setRendererFactory(dfr);
 	}
 
 	private void setupActions() {
@@ -485,13 +483,13 @@ public class BlobVis extends JPanel {
 		singleforce.add(colorsetup);
 		singleforce.add(new ForceDirectedLayout(GRAPH));
 		singleforce.add(new RepaintAction());
-		m_vis.putAction(ACTION_1SFORCE, singleforce);
+		mvis.putAction(ACTION_1SFORCE, singleforce);
 
 		ActionList basePaused = new ActionList(1000);
 		basePaused.add(filter);
 		basePaused.add(colorsetup); // base.add(new AggregateLayout(AGGR));
 		basePaused.add(new RepaintAction());
-		m_vis.putAction(ACTION_BASEPAUSED, basePaused);
+		mvis.putAction(ACTION_BASEPAUSED, basePaused);
 
 		// ActionList pausedActions = new ActionList(500);
 		// pausedActions.add(new VisibilityAnimator());
@@ -518,10 +516,10 @@ public class BlobVis extends JPanel {
 				}
 			}
 		});
-		m_vis.putAction(ACTION_PLAY, playac);
+		mvis.putAction(ACTION_PLAY, playac);
 
-		m_vis.putAction(ACTION_FORCE, force);
-		m_vis.putAction("init", init);
+		mvis.putAction(ACTION_FORCE, force);
+		mvis.putAction("init", init);
 	}
 
 	/**
@@ -529,7 +527,7 @@ public class BlobVis extends JPanel {
 	 */
 	protected void runEverything() {
 		if (bgf.getGraph() != null) {
-			m_vis.run("init");
+			mvis.run("init");
 			tmpRestartForce();
 		}
 	}
@@ -540,7 +538,7 @@ public class BlobVis extends JPanel {
 	 * Helper for force simulation action controls.
 	 */
 	private void stopForce() {
-		m_vis.cancel(ACTION_FORCE);
+		mvis.cancel(ACTION_FORCE);
 		pause.setText("Start force simulation");
 		paused = true;
 	}
@@ -551,7 +549,7 @@ public class BlobVis extends JPanel {
 	 * Helper for force simulation action controls.
 	 */
 	private void startForce() {
-		m_vis.run(ACTION_FORCE);
+		mvis.run(ACTION_FORCE);
 		pause.setText("Pause force simulation");
 		paused = false;
 	}
@@ -560,7 +558,7 @@ public class BlobVis extends JPanel {
 	 * Stop force simulation, temporarily. Keep current state
 	 */
 	private void tmpStopForce() {
-		m_vis.cancel(ACTION_FORCE);
+		mvis.cancel(ACTION_FORCE);
 		pause.setText("Start force simulation");
 	}
 
@@ -568,12 +566,13 @@ public class BlobVis extends JPanel {
 	 * Start force simulation if needed;
 	 */
 	private void tmpRestartForce() {
-		if (!paused) {
-			m_vis.run(ACTION_FORCE);
-			pause.setText("Pause force simulation");
-		} else {
+		if (paused) {
 			pause.setText("Start force simulation");
-			m_vis.cancel(ACTION_FORCE);
+			mvis.cancel(ACTION_FORCE);
+		} else {
+			mvis.run(ACTION_FORCE);
+			pause.setText("Pause force simulation");
+
 		}
 	}
 
@@ -583,9 +582,9 @@ public class BlobVis extends JPanel {
 	 * @return true if new state is "running"
 	 */
 	private boolean toggleForce() {
-		if (m_vis.getAction(ACTION_FORCE).isRunning()) {
+		if (mvis.getAction(ACTION_FORCE).isRunning()) {
 			stopForce();
-			return false;
+			return false; //NOPMD
 		} else {
 			startForce();
 			return true;
@@ -593,19 +592,19 @@ public class BlobVis extends JPanel {
 	}
 
 	private void toggleGrayscale() {
-		grayScale = !grayScale;
+		grayScale ^= grayScale;
 		colorsetup = getColorSetup(grayScale);
 
 
 		String[] actionlist = { ACTION_FORCE, ACTION_1SFORCE, "init" };
 		for (String s : actionlist) {
-			boolean isRunning = m_vis.getAction(s).isRunning();
-			ActionList al = (ActionList) m_vis.removeAction(s);
+			boolean isRunning = mvis.getAction(s).isRunning();
+			ActionList al = (ActionList) mvis.removeAction(s);
 			al.remove(1);
 			al.add(1, colorsetup);
-			m_vis.putAction(s, al);
+			mvis.putAction(s, al);
 			if (isRunning) {
-				m_vis.run(s);
+				mvis.run(s);
 			}
 		}
 		tmpRunForce1s();
@@ -660,7 +659,7 @@ public class BlobVis extends JPanel {
 					ColorLib.gray(160), ColorLib.gray(200), };
 		} else {
 			palette = new int[] { ColorLib.rgba(255, 110, 110, 210), // adb 0
-					ColorLib.rgba(100, 255, 000, 210), // apb 1
+					ColorLib.rgba(100, 255, 0, 210), // apb 1
 					ColorLib.rgba(255, 200, 200, 210), // data 2
 					ColorLib.rgba(200, 255, 200, 210), // inpgr 3
 			};
@@ -696,12 +695,12 @@ public class BlobVis extends JPanel {
 	 */
 	private VisualGraph setGraph(Graph g) {
 		// update graph
-		m_vis.removeGroup(GRAPH);
-		vg = m_vis.addGraph(GRAPH, g);
+		mvis.removeGroup(GRAPH);
+		vg = mvis.addGraph(GRAPH, g);
 		bgf.setVisualGraph(vg);
-		m_vis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
+		mvis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
 		VisualItem f = (VisualItem) vg.getNode(0);
-		m_vis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
+		mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
 		f.setFixed(false);
 		return vg;
 	}
@@ -850,7 +849,8 @@ public class BlobVis extends JPanel {
 	 */
 	private static JMenu setupFileMenu(final BlobVis ad) {
 		JMenu fileMenu = new JMenu("File");
-		fileMenu.add(new OpenGraphAction(prefs){
+		fileMenu.add(new AbstractOpenGraphAction(
+		){
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				ad.readData(null);
@@ -886,7 +886,7 @@ public class BlobVis extends JPanel {
 					ad.display.addPaintListener(debug);
 				} else {
 					ad.display.removePaintListener(debug);
-					debug = null;
+					debug = null;//NOPMD
 				}
 				ad.display.repaint();
 			}

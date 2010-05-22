@@ -4,7 +4,7 @@ import model.Blob;
 import prefuse.controls.Control;
 import prefuse.data.Schema;
 
-public class BFConstants {
+public final class BFConstants {
 	public static final String BLOBFIELD = "blob.field";
 	public static final Schema BLOB_SCHEMA = new Schema();
 	public static final Schema EDGE_SCHEMA = new Schema();

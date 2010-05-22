@@ -55,7 +55,7 @@ public class StepResult {
 				|| apbnext == null
 				|| adbcur == null
 				|| apbcur == null) {
-			throw new RuntimeException("Object not valid: " + "apbnext:"
+			throw new IllegalArgumentException("Object not valid: " + "apbnext:"
 					+ apbnext + ", " + "adbnext:" + adbnext + ", "
 					+ "apbcur:" + apbcur + ", " + "adbcur:" + adbcur + ", ");
 		}
