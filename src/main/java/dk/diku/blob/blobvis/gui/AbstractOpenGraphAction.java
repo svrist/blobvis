@@ -26,7 +26,7 @@ public abstract class AbstractOpenGraphAction extends AbstractAction {
 
 
 	public static String getBlobConfigFilename(Component c,Preferences prefs) {
-		String lastUsedDir = prefs.get("LAST_USED_PATH", "");
+		String lastUsedDir = prefs.get("LAST_USED_PATH", "blobprograms");
 		JFileChooser jfc = new JFileChooser(lastUsedDir);
 		jfc.setDialogType(JFileChooser.OPEN_DIALOG);
 		jfc.setDialogTitle("Open Graph or Tree File");

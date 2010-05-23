@@ -1,0 +1,42 @@
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0 http://maven.apache.org/xsd/assembly-1.1.0.xsd">
+  <id>bin</id>
+  <formats>
+    <format>zip</format>
+  </formats>
+  <dependencySets>
+    <dependencySet>
+      <outputDirectory>lib</outputDirectory>
+    </dependencySet>
+  </dependencySets>
+  <fileSets>
+    <fileSet>
+      <outputDirectory></outputDirectory>
+      <directory>src/main/bin</directory>
+      <lineEnding>dos</lineEnding>
+      <includes>
+        <include>*.bat</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <outputDirectory></outputDirectory>
+      <directory>src/main/bin</directory>
+      <includes>
+        <include>*.sh</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <outputDirectory>blobprograms</outputDirectory>
+      <directory>../blobhart/Main/Simulator/Examples</directory>
+    </fileSet>
+    <fileSet>
+      <outputDirectory>blobprograms</outputDirectory>
+      <directory>../Blob/Main/Simulator/Examples</directory>
+    </fileSet>
+
+  </fileSets>
+</assembly>
+
