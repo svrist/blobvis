@@ -253,15 +253,21 @@ public class BlobGraphFuser implements BlobFuser {
 				FuseUtil.removeEdge(g,edge.getSourceNode(),edge.getTargetNode(),true);
 			}
 		}
-		Edge ne = getGraph().addEdge(n1, n2);
+		if (n1 != null && n2 != null){
+			Edge ne = getGraph().addEdge(n1, n2);
 
-		ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
-		ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
+			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
+		}
 	}
 
 	@SuppressWarnings("unchecked")
 	private List<Edge> gatherRemoveList(BondSite needle, Node n) {
+
 		List<Edge> rems = new ArrayList<Edge>();
+		if (n== null) {
+			return rems;
+		}
 		Iterator removeIterator = n.edges();
 		while (removeIterator.hasNext()) {
 			Edge ce = (Edge) removeIterator.next();
@@ -330,13 +336,60 @@ public class BlobGraphFuser implements BlobFuser {
 		case INS:
 			result = doINS(apb(),adb(),o);
 			break;
+		case SWP3:
+			result = doSWP3(apb(),adb(),o);
+			break;
+		case SWP1:
+			result = doSWP1(apb(),adb(),o);
+			break;
+
 		case FIN:
 			// do default action.
+
+
 		default:
 			result = new StepResult(apb(), adb()); // Default action
 			break;
 		}
 		execute(result);
+	}
+
+	private void doSWP(Blob adb,BondSite bs0, BondSite bs1, BondSite bs2){
+		Blob b1=adb.follow(bs1);
+		Blob b10=adb.follow(bs1).follow(bs0);
+		Blob b2 = adb.follow(bs2);
+		Blob b20=adb.follow(bs2).follow(bs0);
+
+		if (b10 != null){
+			Edge ne = getGraph().addEdge(getNode(b2), getNode(b10));
+			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b10.boundTo(b1).ordinal());
+			FuseUtil.removeEdge(getGraph(), getNode(b1), getNode(b10),true);
+			System.out.println("B10:"+b10+". New edge from "+b2+" to "+b10);
+		}
+		if (b20 != null){
+			Edge ne = getGraph().addEdge(getNode(b1), getNode(b20));
+			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b20.boundTo(b2).ordinal());
+			FuseUtil.removeEdge(getGraph(), getNode(b2), getNode(b20),true);
+			System.out.println("B10:"+b20+". New edge from "+b1+" to "+b20);
+		}
+
+
+	}
+	private StepResult doSWP3(Blob apb, Blob adb,Operation o) {
+		StepResult result =  new StepResult(apb, adb);
+		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
+		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
+		doSWP(adb,BondSite.West,b1,b2);
+		return result;
+	}
+	private StepResult doSWP1(Blob apb, Blob adb,Operation o) {
+		StepResult result =  new StepResult(apb, adb);
+		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
+		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
+		doSWP(adb,BondSite.East,b1,b2);
+		return result;
 	}
 
 	private StepResult doINS(Blob apb, Blob adb,Operation o) {
@@ -351,6 +404,7 @@ public class BlobGraphFuser implements BlobFuser {
 		// this corrosponds to some kind of advice in aspect orient.
 		Blob newBlob = adb.follow(b);
 		addBlobAsNode(newBlob, false);
+
 		if( oldBlob != null )
 		{
 			addEdge( oldBlob, newBlob);
@@ -359,6 +413,7 @@ public class BlobGraphFuser implements BlobFuser {
 		addEdge( adb, newBlob);
 		return result;
 	}
+
 
 	protected void execute(StepResult sr){
 		sr.testValid();
@@ -373,6 +428,12 @@ public class BlobGraphFuser implements BlobFuser {
 		if (sr.rereadCargo){
 			rereadCargo(sr.adbnext);
 		}
+
+		/*System.out.println(sr.adbnext+" "+m.ADB());
+		for(BondSite bs : BondSite.asList()){
+			System.out.print(bs.ordinal()+":"+sr.adbnext.follow(bs)+" ");
+		}
+		System.out.println(";");*/
 	}
 
 

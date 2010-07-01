@@ -9,7 +9,7 @@ public class Operation {
 	public enum OP {
 		CHD,
 		SBS,
-		JB, DBS, SCG, JN, SWL, JCG,FIN,INS
+		JB, DBS, SCG, JN, SWL, JCG,FIN,INS,SWP1,SWP3
 	}
 	public Operation args(List<String> args){
 		this.args = args;
