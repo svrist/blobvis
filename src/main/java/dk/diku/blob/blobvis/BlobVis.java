@@ -80,58 +80,41 @@ import dk.diku.blob.blobvis.prefuse.StepResult;
 
 @SuppressWarnings("serial")
 public class BlobVis extends JPanel {
-	private static final String PREFS_LAST_HOPS = "LAST_HOPS";
-	private static final String ACTION_BASEPAUSED = "basepaused";
-	private static final String ACTION_PLAY = "play";
-	public static final String ACTION_1SFORCE = "1sforce";
-	public static final String ACTION_FORCE = "force";
+	public class PauseForceAction implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			mvis.cancel(ACTION_BASEPAUSED);
+			toggleForce();
+		}
+	}
+	private final class PopupListener extends ControlAdapter {
+		@Override
+		public void itemReleased(final VisualItem item, MouseEvent e) {
+			if (e.isPopupTrigger()) {
+				item.setFixed(true);
+				tmpStopForce();
+				boolean inpgr = (Boolean) item.get(BFConstants.BLOBINPGR);
+				if (!inpgr) { // only show menu for data blobs
+					DataBlobPopupMenu menu = new DataBlobPopupMenu(
+							BlobVis.this, bgf, item);
+					menu.addFocusListener(new FocusListener() {
+						@Override
+						public void focusGained(FocusEvent e) {
+							tmpStopForce();
+						}
 
-	private static Preferences prefs;
-
-	// The file currently open. For restarting.
-	private String currentFile = null;
-
-	// Constants for prefuse.
-	private static final String GRAPH = "graph";
-	private static final String EDGES = "graph.edges";
-	private static final String NODES = "graph.nodes";
-	private static final int DEFAULT_HOPS = 10;
-
-	// Prefuse layers
-	private Visualization mvis;
-	private Display display;
-	// private Graph g;
-	private VisualGraph vg;
-
-	// defaults
-	private int hops;
-
-	// Shared filter.
-	private final GraphDistanceFilter filter;
-
-	// Bonding between Prefuse graph and blob simulator model.
-	private BlobGraphModel bgf;
-
-	// Swing components
-	private ProgressMonitor progressMonitor;
-	private final JButton pause;
-	private final JButton step;
-	private final JButton play;
-	private final JButton restart;
-	private final JValueSlider slider;
-
-	// State flags
-	private boolean ended = true;
-	private boolean paused = false;
-
-	private boolean grayScale;
-
-	private ActionList colorsetup;
-
-	private StepModelAction stepModelAction;
-	private ForceDirectedLayout forceLayout;
-
-	private final class ProgressListener implements
+						@Override
+						public void focusLost(FocusEvent e) {
+							tmpRestartForce();
+						}
+					});
+					menu.show(e.getComponent(), e.getX(), e.getY());
+					menu.requestFocus();
+				}
+			}
+		}
+	}
+	protected final class ProgressListener implements
 	PropertyChangeListener {
 		private final ReadBlobConfigTask task;
 		private final String filename;
@@ -168,43 +151,6 @@ public class BlobVis extends JPanel {
 			}
 		}
 	}
-
-	private final class PopupListener extends ControlAdapter {
-		@Override
-		public void itemReleased(final VisualItem item, MouseEvent e) {
-			if (e.isPopupTrigger()) {
-				item.setFixed(true);
-				tmpStopForce();
-				boolean inpgr = (Boolean) item.get(BFConstants.BLOBINPGR);
-				if (!inpgr) { // only show menu for data blobs
-					DataBlobPopupMenu menu = new DataBlobPopupMenu(
-							BlobVis.this, bgf, item);
-					menu.addFocusListener(new FocusListener() {
-						@Override
-						public void focusLost(FocusEvent e) {
-							tmpRestartForce();
-						}
-
-						@Override
-						public void focusGained(FocusEvent e) {
-							tmpStopForce();
-						}
-					});
-					menu.show(e.getComponent(), e.getX(), e.getY());
-					menu.requestFocus();
-				}
-			}
-		}
-	}
-
-	public class PauseForceAction implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			mvis.cancel(ACTION_BASEPAUSED);
-			toggleForce();
-		}
-	}
-
 	public class StepModelAction implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -223,92 +169,16 @@ public class BlobVis extends JPanel {
 		}
 
 	}
-
-	public boolean isForcePaused() {
-		return !mvis.getAction(ACTION_FORCE).isRunning();
-	}
-
-	private void tmpRunForce1s() {
-		if (isForcePaused()) {
-			mvis.cancel(ACTION_1SFORCE);
-			mvis.run(ACTION_1SFORCE);
-		}
-	}
-
-	public BlobVis() {
-		super(new BorderLayout());
-		bgf = new BlobGraphModel();
-
-		mvis = new Visualization();
-
-		hops = prefs.getInt(PREFS_LAST_HOPS, DEFAULT_HOPS);
-
-		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
-		// init base components.
-		setupRenderer();
-		setupActions();
-		setupDisplay();
-		setupModelStepListeners();
-
-		JPanel panel = new JPanel();
-		step = new JButton("Step program");
-		restart = new JButton("Restart program");
-		play = new JButton("Play program");
-		pause = new JButton("Pause force movements");
-		slider = new JValueSlider("Distance", 0, 35, hops);
-
-		Box boxpanel = setupBoxpanel(); //NOPMD
-		panel.add(boxpanel);
-		JSplitPane split = setupSplitPane(display, panel);
-		add(split);
-		ended = true;
-		disableButtons();
-		restart.setEnabled(false);
-
-	}
-
-	private void setupModelStepListeners() {
-		bgf.registerOpcodeListener("EXT", new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				ended = true;
-				step.setEnabled(false);
-				tmpStopForce();
-
-				mvis.run(ACTION_1SFORCE);
-			}
-		});
-		bgf.registerStepListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				StepResult sr = (StepResult) e.getSource();
-				VisualItem vnn = (VisualItem) vg.getNode(bgf
-						.getNode(sr.apbnext).getRow());
-				mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
-			}
-		});
-	}
-
-	private void readData(String filename) {
-		String f = filename;
-		if (filename == null || "".equals(filename)) {
-			f = AbstractOpenGraphAction.getBlobConfigFilename(this, prefs);
-		}
-		if (f != null) {
-			readProgramAndDataAsGraph(f);
-		}
-	}
-
 	class ZoomActionListener extends AbstractZoomControl implements
 	ActionListener {
 		private float direction = 1;
+
+		private final Point point = new Point();
 
 		ZoomActionListener(float direction) {
 			super();
 			this.direction = direction;
 		}
-
-		private Point point = new Point();
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -319,314 +189,14 @@ public class BlobVis extends JPanel {
 		}
 	}
 
-	private Box setupBoxpanel() {
-		Box buttons = setupStepButton();
-		Box forcebuttons = setupForceControlButton();
-		Box cf = setupSlider();
+	private static final String PREFS_LAST_HOPS = "LAST_HOPS";
 
-		Box boxpanel = new Box(BoxLayout.Y_AXIS);
-		boxpanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		boxpanel.add(buttons);
-		boxpanel.add(Box.createVerticalStrut(20));
-		boxpanel.add(forcebuttons);
-		boxpanel.add(Box.createVerticalStrut(20));
-		boxpanel.add(cf);
-		// boxpanel.add(Box.createVerticalStrut(100));
-		boxpanel.add(Box.createVerticalGlue());
+	private static final String ACTION_BASEPAUSED = "basepaused";
 
-		Box zoomButtons = new Box(BoxLayout.X_AXIS);
-		zoomButtons.setAlignmentX(LEFT_ALIGNMENT);
-		zoomButtons.setAlignmentY(BOTTOM_ALIGNMENT);
-		zoomButtons.setBorder(BorderFactory.createTitledBorder("Zoom"));
-		JButton zoomPlus = new JButton("+");
-		zoomButtons.add(zoomPlus);
-		zoomPlus.addActionListener(new ZoomActionListener(1.2f));
-
-		JButton zoomMinus = new JButton("-");
-		zoomMinus.addActionListener(new ZoomActionListener(-1.2f));
-		zoomButtons.add(zoomMinus);
-
-		JButton zoomFit = new JButton("[]");
-		zoomFit.setToolTipText("Zoom Fit to screen");
-		zoomFit.addActionListener(new ActionListener() {
-			private long duration = 2000;
-			private int margin = 50;
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if (!display.isTranformInProgress()) {
-					Visualization vis = display.getVisualization();
-					Rectangle2D bounds = vis.getBounds(NODES);
-					GraphicsLib.expand(bounds, margin
-							+ (int) (1 / display.getScale()));
-					DisplayLib.fitViewToBounds(display, bounds, duration);
-				}
-			}
-		});
-		zoomButtons.add(zoomFit);
-		boxpanel.add(zoomButtons);
-		return boxpanel;
-	}
-
-	private static JSplitPane setupSplitPane(Component left, Component right) {
-		JSplitPane split = new JSplitPane();
-		split.setLeftComponent(left);
-		split.setRightComponent(right);
-		split.setOneTouchExpandable(true);
-		split.setContinuousLayout(false);
-		split.setDividerLocation(-1);
-		return split;
-	}
-
-	private Box setupSlider() {
-		Color c = UIManager.getLookAndFeel().getDefaults().getColor("Panel.background");
-		slider.setBackground(c);
-
-		slider.addChangeListener(new ChangeListener() {
-			public void stateChanged(ChangeEvent e) {
-				int sliderHops = slider.getValue().intValue();
-				filter.setDistance(sliderHops);
-				prefs.putInt(PREFS_LAST_HOPS,sliderHops);
-
-				if (!mvis.getAction(ACTION_FORCE).isRunning()){
-					mvis.cancel(ACTION_1SFORCE);
-					mvis.run(ACTION_1SFORCE);
-				}
-			}
-		});
-
-		Box cf = new Box(BoxLayout.Y_AXIS);
-		cf.setAlignmentX(Component.LEFT_ALIGNMENT);
-		cf.add(slider);
-		cf.setBorder(BorderFactory.createTitledBorder("Connectivity Filter"));
-		return cf;
-	}
-
-	private Box setupForceControlButton() {
-		Box forcebuttons = new Box(BoxLayout.Y_AXIS);
-		forcebuttons.setAlignmentX(Component.LEFT_ALIGNMENT);
-		pause.addActionListener(new PauseForceAction());
-		pause.setEnabled(true);
-		forcebuttons.add(pause);
-
-		forcebuttons.setBorder(BorderFactory
-				.createTitledBorder("Force simulation ctrl"));
-		forcebuttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
-				Short.MAX_VALUE));
-
-		return forcebuttons;
-	}
-
-	private final Box setupStepButton() {
-		Box buttons = new Box(BoxLayout.X_AXIS);
-		JPanel mig = new JPanel(new MigLayout());
-		buttons.setBorder(BorderFactory.createTitledBorder("Blob Model"));
-		buttons.setAlignmentX(LEFT_ALIGNMENT);
-
-		stepModelAction = new StepModelAction();
-
-		step.addActionListener(stepModelAction);
-		step.setEnabled(true);
-		mig.add(step);
-
-		play.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if (!ended && !mvis.getAction(ACTION_PLAY).isRunning()) {
-					mvis.cancel(ACTION_PLAY);
-					mvis.run(ACTION_PLAY);
-					play.setText("Stop program");
-				} else {
-					play.setText("Play program");
-					mvis.cancel(ACTION_PLAY);
-				}
-			}
-		});
-
-		mig.add(play);
-		play.setEnabled(true);
-		restart.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				tmpStopForce();
-				readProgramAndDataAsGraph(currentFile);
-
-			}
-		});
-		restart.setEnabled(true);
-		mig.add(restart);
-
-		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE, Short.MAX_VALUE));
-		buttons.add(mig);
-		return buttons;
-	}
-
-	private void setupDisplay() {
-		// set up the display
-		display = new Display(mvis);
-		display.setSize(800, 800);
-		display.pan(400, 400);
-		display.setHighQuality(true);
-		// display.setItemSorter(new TreeDepthItemSorter());
-
-		display.addControlListener(new BlobDragControl());
-		display.addControlListener(new PanControl());
-		display.addControlListener(new WheelZoomControl());
-		display.addControlListener(new PopupListener());
-	}
-
-	private void setupRenderer() {
-		LabelRenderer tr = new LabelRenderer();
-		tr.setRoundedCorner(8, 8);
-		DefaultRendererFactory dfr = new DefaultRendererFactory(tr,
-				new BlobEdgeRenderer());
-		mvis.setRendererFactory(dfr);
-	}
-
-	private void setupActions() {
-		// now create the main layout routine
-		ActionList init = new ActionList();
-
-		forceLayout = new ForceDirectedLayout(GRAPH);
-
-		init.add(filter);
-		colorsetup = getColorSetup(grayScale);
-		init.add(colorsetup);
-		init.add(new RadialTreeLayout(GRAPH));
-		// init.add(new RandomLayout());
-		init.add(new RepaintAction());
-
-		ActionList singleforce = new ActionList(1000);
-		singleforce.add(filter);
-		singleforce.add(colorsetup);
-		singleforce.add(forceLayout);
-		singleforce.add(new RepaintAction());
-		mvis.putAction(ACTION_1SFORCE, singleforce);
-
-		ActionList basePaused = new ActionList(1000);
-		basePaused.add(filter);
-		basePaused.add(colorsetup); // base.add(new AggregateLayout(AGGR));
-		basePaused.add(new RepaintAction());
-		mvis.putAction(ACTION_BASEPAUSED, basePaused);
-
-		// ActionList pausedActions = new ActionList(500);
-		// pausedActions.add(new VisibilityAnimator());
-
-		// m_vis.putAction("pausedactions", pausedActions);
-		// m_vis.alwaysRunAfter("pausedactions", "basepaused");
-
-		ActionList force = new ActionList(Action.INFINITY, 32);
-		force.add(filter);
-		force.add(colorsetup);
-		force.add(forceLayout);
-		// force.add(AggrForce());
-		force.add(new RepaintAction());
-
-		final ActionList playac = new ActionList(Action.INFINITY, 500);
-		playac.add(new Action() {
-			@Override
-			public void run(double frac) {
-				stepModelAction.actionPerformed(null);
-				if (ended) {
-					play.setText("Play program");
-					play.setEnabled(false);
-					playac.cancel();
-				}
-			}
-		});
-		mvis.putAction(ACTION_PLAY, playac);
-
-		mvis.putAction(ACTION_FORCE, force);
-		mvis.putAction("init", init);
-	}
-
-	/**
-	 * Start actions if the graph is ready.
-	 */
-	protected void runEverything() {
-		if (bgf.getGraph() != null) {
-			mvis.run("init");
-			tmpRestartForce();
-		}
-	}
-
-	/**
-	 * Stop force simulation actions.
-	 * 
-	 * Helper for force simulation action controls.
-	 */
-	private void stopForce() {
-		mvis.cancel(ACTION_FORCE);
-		pause.setText("Start force simulation");
-		paused = true;
-	}
-
-	/**
-	 * Start force simulation actions.
-	 * 
-	 * Helper for force simulation action controls.
-	 */
-	private void startForce() {
-		mvis.run(ACTION_FORCE);
-		pause.setText("Pause force simulation");
-		paused = false;
-	}
-
-	/**
-	 * Stop force simulation, temporarily. Keep current state
-	 */
-	private void tmpStopForce() {
-		mvis.cancel(ACTION_FORCE);
-		pause.setText("Start force simulation");
-	}
-
-	/**
-	 * Start force simulation if needed;
-	 */
-	private void tmpRestartForce() {
-		if (paused) {
-			pause.setText("Start force simulation");
-			mvis.cancel(ACTION_FORCE);
-		} else {
-			mvis.run(ACTION_FORCE);
-			pause.setText("Pause force simulation");
-
-		}
-	}
-
-	/**
-	 * Toggle the force simulation
-	 * 
-	 * @return true if new state is "running"
-	 */
-	private boolean toggleForce() {
-		if (mvis.getAction(ACTION_FORCE).isRunning()) {
-			stopForce();
-			return false; //NOPMD
-		} else {
-			startForce();
-			return true;
-		}
-	}
-
-	private void toggleGrayscale() {
-		grayScale ^= true;
-		colorsetup = getColorSetup(grayScale);
-
-
-		String[] actionlist = { ACTION_FORCE, ACTION_1SFORCE, "init" };
-		for (String s : actionlist) {
-			boolean isRunning = mvis.getAction(s).isRunning();
-			ActionList al = (ActionList) mvis.removeAction(s);
-			al.remove(1);
-			al.add(1, colorsetup);
-			mvis.putAction(s, al);
-			if (isRunning) {
-				mvis.run(s);
-			}
-		}
-		tmpRunForce1s();
-
-	}
+	private static final String ACTION_PLAY = "play";
+	public static final String ACTION_1SFORCE = "1sforce";
+	public static final String ACTION_FORCE = "force";
+	public static Preferences prefs;
 
 	/**
 	 * Setup colors for nodes, edges, text and the different types of nodes.
@@ -701,83 +271,6 @@ public class BlobVis extends JPanel {
 
 		return colors;
 	}
-
-	/**
-	 * When a graph is ready make it a visual graph, and make the first node the
-	 * focus of the visualization.
-	 * 
-	 * @param g
-	 *            The graph with all the nodes.
-	 * @return A visual graph.
-	 */
-	private VisualGraph setGraph(Graph g) {
-		// update graph
-		mvis.removeGroup(GRAPH);
-		vg = mvis.addGraph(GRAPH, g);
-		bgf.setVisualGraph(vg);
-		mvis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
-		VisualItem f = (VisualItem) vg.getNode(0);
-		mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
-		f.setFixed(false);
-		return vg;
-	}
-
-	/**
-	 * Start loading the data from the filename in a background task When done
-	 * the progress monitor will close and buttons will be activated.
-	 * 
-	 * @param filename
-	 *            Blob configuration filename
-	 */
-	public void readProgramAndDataAsGraph(final String filename) {
-		setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-		disableButtons();
-		ended = true;
-		Component c = this;
-		while (c != null && !(c instanceof JFrame)) {
-			c = c.getParent();
-		}
-		progressMonitor = new ProgressMonitor(c,
-				"Loading Blob configuration from " + filename + "...", "", 0,
-				100);
-		progressMonitor.setProgress(0);
-
-		// Create empy models and graphs.
-		bgf.reset();
-		// Setup task
-		final ReadBlobConfigTask t = new ReadBlobConfigTask(filename, bgf);
-
-		// add progress and done listeners.
-		t.addPropertyChangeListener(new ProgressListener(t, filename));
-
-		t.execute();
-
-	}
-
-	/**
-	 * Disable all irrellevant buttons
-	 * 
-	 * For example when loading a big graph
-	 */
-	private void disableButtons() {
-		pause.setEnabled(false);
-		play.setEnabled(false);
-		step.setEnabled(false);
-		slider.setEnabled(false);
-	}
-
-	/**
-	 * Enable the buttons
-	 * 
-	 * For example when the model and graph is ready.
-	 */
-	protected void enableButtons() {
-		pause.setEnabled(true);
-		play.setEnabled(true);
-		step.setEnabled(true);
-		slider.setEnabled(true);
-	}
-
 	public static void main(String[] argv) {
 		// provide a final pointer to the filename while still being able to
 		// change the value dynamically.
@@ -792,79 +285,13 @@ public class BlobVis extends JPanel {
 		// filename is a final pointer to an array with one value.
 		// When including in nested classes it must be final.
 		javax.swing.SwingUtilities.invokeLater(new Runnable() {
+			@Override
 			public void run() {
 				start(filename[0]);
 			}
 		});
 
 	}
-
-	/**
-	 * Setup and display the main frame.
-	 * 
-	 * @param filename
-	 *            Filename to load (if any)
-	 * @return JFrame
-	 */
-	public static JFrame start(String filename) {
-		UILib.setPlatformLookAndFeel();
-		JFrame frame = new JFrame("dikuBlob - B l o b V i s");
-		final BlobVis ad = new BlobVis();
-		JMenuBar menubar = new JMenuBar();
-		menubar.add(setupFileMenu(ad));
-		//		menubar.add(setupDataMenu());
-		menubar.add(setupSettingsMenu(ad));
-
-		frame.setJMenuBar(menubar);
-
-		frame.setExtendedState(Frame.MAXIMIZED_HORIZ);
-
-		frame.getContentPane().add(ad);
-
-		frame.pack();
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setVisible(true);
-		ad.readData(filename);
-		return frame;
-	}
-
-	private static JMenu setupSettingsMenu(final BlobVis ad) {
-		JMenu setMenu = new JMenu("Settings");
-		JMenuItem forceSet = new JMenuItem("Force-simulation settings...");
-		forceSet.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				JForcePanel.showForcePanel(ad.forceLayout.getForceSimulator());
-			}
-		});
-		setMenu.add(forceSet);
-		JCheckBoxMenuItem cbGrayItem;
-		cbGrayItem = new JCheckBoxMenuItem("GrayScale colors");
-		cbGrayItem.setMnemonic('g');
-		cbGrayItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
-		cbGrayItem.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				System.out.println("Toggle Gray");
-				ad.toggleGrayscale();
-			}
-		});
-		setMenu.add(cbGrayItem);
-		return setMenu;
-	}
-
-	/**
-	 * Setup the menubar item "data"
-	 * 
-	 * @return The menubar item "data"
-	 */
-	private static JMenu setupDataMenu() {
-		JMenu dataMenu = new JMenu("Data");
-		dataMenu.add("Save current data to .bld file...");
-		dataMenu.add("Replace current data from file...");
-		return dataMenu;
-	}
-
 	/**
 	 * Setup the menubar item "file"
 	 * 
@@ -905,6 +332,7 @@ public class BlobVis extends JPanel {
 		cbMenuItem.addActionListener(new ActionListener() {
 			private PaintListener debug = null;
 
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (debug == null) {
 					debug = new DebugStatsPainter();
@@ -926,6 +354,7 @@ public class BlobVis extends JPanel {
 		JMenuItem exitItem = new JMenuItem("Exit");
 		exitItem.setMnemonic('x');
 		exitItem.addActionListener(new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				System.exit(0);
 			}
@@ -934,5 +363,573 @@ public class BlobVis extends JPanel {
 		fileMenu.add(exitItem);
 		fileMenu.setMnemonic('F');
 		return fileMenu;
+	}
+
+	private static JMenu setupSettingsMenu(final BlobVis ad) {
+		JMenu setMenu = new JMenu("Settings");
+		JMenuItem forceSet = new JMenuItem("Force-simulation settings...");
+		forceSet.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JForcePanel.showForcePanel(ad.forceLayout.getForceSimulator());
+			}
+		});
+		setMenu.add(forceSet);
+		JCheckBoxMenuItem cbGrayItem;
+		cbGrayItem = new JCheckBoxMenuItem("GrayScale colors");
+		cbGrayItem.setMnemonic('g');
+		cbGrayItem.setAccelerator(KeyStroke.getKeyStroke("ctrl G"));
+		cbGrayItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				System.out.println("Toggle Gray");
+				ad.toggleGrayscale();
+			}
+		});
+		setMenu.add(cbGrayItem);
+		return setMenu;
+	}
+
+	private static JSplitPane setupSplitPane(Component left, Component right) {
+		JSplitPane split = new JSplitPane();
+		split.setLeftComponent(left);
+		split.setRightComponent(right);
+		split.setOneTouchExpandable(true);
+		split.setContinuousLayout(false);
+		split.setDividerLocation(-1);
+		return split;
+	}
+
+	public static JFrame setupUI(final BlobVis ad) {
+		UILib.setPlatformLookAndFeel();
+		JFrame frame = new JFrame("dikuBlob - B l o b V i s");
+		
+		JMenuBar menubar = new JMenuBar();
+		menubar.add(setupFileMenu(ad));
+		//		menubar.add(setupDataMenu());
+		menubar.add(setupSettingsMenu(ad));
+
+		frame.setJMenuBar(menubar);
+
+		frame.setExtendedState(Frame.MAXIMIZED_HORIZ);
+
+		frame.getContentPane().add(ad);
+
+		frame.pack();
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setVisible(true);
+		return frame;
+	}
+	/**
+	 * Setup and display the main frame.
+	 * 
+	 * @param filename
+	 *            Filename to load (if any)
+	 * @return JFrame
+	 */
+	public static JFrame start(String filename) {
+		final BlobVis ad = new BlobVis();
+		JFrame frame = setupUI(ad);
+		ad.readData(filename);
+		return frame;
+	}
+
+	// The file currently open. For restarting.
+	protected String currentFile = null;
+	// Constants for prefuse.
+	private static final String GRAPH = "graph";
+	private static final String EDGES = "graph.edges";
+	private static final String NODES = "graph.nodes";
+	private static final int DEFAULT_HOPS = 10;
+	// Prefuse layers
+	protected final Visualization mvis;
+
+	protected Display display;
+	// private Graph g;
+	protected VisualGraph vg;
+
+	// defaults
+	private final int hops;
+
+	// Shared filter.
+	private final GraphDistanceFilter filter;
+
+	// Bonding between Prefuse graph and blob simulator model.
+	protected final BlobGraphModel bgf;
+	// Swing components
+	private ProgressMonitor progressMonitor;
+
+	private final JButton pause;
+
+	private final JButton step;
+
+	private final JButton play;
+
+	protected final JButton restart;
+
+	private final JValueSlider slider;
+
+	// State flags
+	protected boolean ended = true;
+
+	protected boolean paused = false;
+
+	private boolean grayScale;
+
+	private ActionList colorsetup;
+
+	private StepModelAction stepModelAction;
+
+	private ForceDirectedLayout forceLayout;
+
+	public BlobVis() {
+		super(new BorderLayout());
+		bgf = new BlobGraphModel();
+
+		mvis = new Visualization();
+
+		hops = prefs.getInt(PREFS_LAST_HOPS, DEFAULT_HOPS);
+
+		filter = new GraphDistanceFilter(GRAPH, Visualization.FOCUS_ITEMS, hops);
+		// init base components.
+		setupRenderer();
+		setupActions();
+		setupDisplay();
+		setupModelStepListeners();
+
+		JPanel panel = new JPanel();
+		step = new JButton("Step program");
+		restart = new JButton("Restart program");
+		play = new JButton("Play program");
+		pause = new JButton("Pause force movements");
+		slider = new JValueSlider("Distance", 0, 35, hops);
+
+		Box boxpanel = setupBoxpanel(); //NOPMD
+		panel.add(boxpanel);
+		JSplitPane split = setupSplitPane(display, panel);
+		add(split);
+		ended = true;
+		disableButtons();
+		restart.setEnabled(false);
+
+	}
+
+	/**
+	 * Disable all irrellevant buttons
+	 * 
+	 * For example when loading a big graph
+	 */
+	private void disableButtons() {
+		pause.setEnabled(false);
+		play.setEnabled(false);
+		step.setEnabled(false);
+		slider.setEnabled(false);
+	}
+
+	/**
+	 * Enable the buttons
+	 * 
+	 * For example when the model and graph is ready.
+	 */
+	protected void enableButtons() {
+		pause.setEnabled(true);
+		play.setEnabled(true);
+		step.setEnabled(true);
+		slider.setEnabled(true);
+	}
+
+	public boolean isForcePaused() {
+		return !mvis.getAction(ACTION_FORCE).isRunning();
+	}
+
+	private void readData(String filename) {
+		String f = filename;
+		if (filename == null || "".equals(filename)) {
+			f = AbstractOpenGraphAction.getBlobConfigFilename(this, prefs);
+		}
+		if (f != null) {
+			readProgramAndDataAsGraph(f);
+		}
+	}
+
+	/**
+	 * Start loading the data from the filename in a background task When done
+	 * the progress monitor will close and buttons will be activated.
+	 * 
+	 * @param filename
+	 *            Blob configuration filename
+	 */
+	public void readProgramAndDataAsGraph(final String filename) {
+		setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+		disableButtons();
+		ended = true;
+		Component c = this;
+		while (c != null && !(c instanceof JFrame)) {
+			c = c.getParent();
+		}
+		progressMonitor = new ProgressMonitor(c,
+				"Loading Blob configuration from " + filename + "...", "", 0,
+				100);
+		progressMonitor.setProgress(0);
+
+		// Create empy models and graphs.
+		bgf.reset();
+		// Setup task
+		final ReadBlobConfigTask t = new ReadBlobConfigTask(filename, bgf);
+
+		// add progress and done listeners.
+		t.addPropertyChangeListener(new ProgressListener(t, filename));
+
+		t.execute();
+
+	}
+
+	/**
+	 * Start actions if the graph is ready.
+	 */
+	protected void runEverything() {
+		if (bgf.getGraph() != null) {
+			mvis.run("init");
+			tmpRestartForce();
+		}
+	}
+
+	/**
+	 * When a graph is ready make it a visual graph, and make the first node the
+	 * focus of the visualization.
+	 * 
+	 * @param g
+	 *            The graph with all the nodes.
+	 * @return A visual graph.
+	 */
+	protected VisualGraph setGraph(Graph g) {
+		// update graph
+		mvis.removeGroup(GRAPH);
+		vg = mvis.addGraph(GRAPH, g);
+		bgf.setVisualGraph(vg);
+		mvis.setValue(EDGES, null, VisualItem.INTERACTIVE, Boolean.FALSE);
+		VisualItem f = (VisualItem) vg.getNode(0);
+		mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(f);
+		f.setFixed(false);
+		return vg;
+	}
+
+	private void setupActions() {
+		// now create the main layout routine
+		ActionList init = new ActionList();
+
+		forceLayout = new ForceDirectedLayout(GRAPH);
+
+		init.add(filter);
+		colorsetup = getColorSetup(grayScale);
+		init.add(colorsetup);
+		init.add(new RadialTreeLayout(GRAPH));
+		// init.add(new RandomLayout());
+		init.add(new RepaintAction());
+
+		ActionList singleforce = new ActionList(1000);
+		singleforce.add(filter);
+		singleforce.add(colorsetup);
+		singleforce.add(forceLayout);
+		singleforce.add(new RepaintAction());
+		mvis.putAction(ACTION_1SFORCE, singleforce);
+
+		ActionList basePaused = new ActionList(1000);
+		basePaused.add(filter);
+		basePaused.add(colorsetup); // base.add(new AggregateLayout(AGGR));
+		basePaused.add(new RepaintAction());
+		mvis.putAction(ACTION_BASEPAUSED, basePaused);
+
+		// ActionList pausedActions = new ActionList(500);
+		// pausedActions.add(new VisibilityAnimator());
+
+		// m_vis.putAction("pausedactions", pausedActions);
+		// m_vis.alwaysRunAfter("pausedactions", "basepaused");
+
+		ActionList force = new ActionList(Action.INFINITY, 32);
+		force.add(filter);
+		force.add(colorsetup);
+		force.add(forceLayout);
+		// force.add(AggrForce());
+		force.add(new RepaintAction());
+
+		final ActionList playac = new ActionList(Action.INFINITY, 500);
+		playac.add(new Action() {
+			@Override
+			public void run(double frac) {
+				stepModelAction.actionPerformed(null);
+				if (ended) {
+					play.setText("Play program");
+					play.setEnabled(false);
+					playac.cancel();
+				}
+			}
+		});
+		mvis.putAction(ACTION_PLAY, playac);
+
+		mvis.putAction(ACTION_FORCE, force);
+		mvis.putAction("init", init);
+	}
+
+	private Box setupBoxpanel() {
+		Box buttons = setupStepButton();
+		Box forcebuttons = setupForceControlButton();
+		Box cf = setupSlider();
+
+		Box boxpanel = new Box(BoxLayout.Y_AXIS);
+		boxpanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		boxpanel.add(buttons);
+		boxpanel.add(Box.createVerticalStrut(20));
+		boxpanel.add(forcebuttons);
+		boxpanel.add(Box.createVerticalStrut(20));
+		boxpanel.add(cf);
+		// boxpanel.add(Box.createVerticalStrut(100));
+		boxpanel.add(Box.createVerticalGlue());
+
+		Box zoomButtons = new Box(BoxLayout.X_AXIS);
+		zoomButtons.setAlignmentX(LEFT_ALIGNMENT);
+		zoomButtons.setAlignmentY(BOTTOM_ALIGNMENT);
+		zoomButtons.setBorder(BorderFactory.createTitledBorder("Zoom"));
+		JButton zoomPlus = new JButton("+");
+		zoomButtons.add(zoomPlus);
+		zoomPlus.addActionListener(new ZoomActionListener(1.2f));
+
+		JButton zoomMinus = new JButton("-");
+		zoomMinus.addActionListener(new ZoomActionListener(-1.2f));
+		zoomButtons.add(zoomMinus);
+
+		JButton zoomFit = new JButton("[]");
+		zoomFit.setToolTipText("Zoom Fit to screen");
+		zoomFit.addActionListener(new ActionListener() {
+			private final long duration = 2000;
+			private final int margin = 50;
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (!display.isTranformInProgress()) {
+					Visualization vis = display.getVisualization();
+					Rectangle2D bounds = vis.getBounds(NODES);
+					GraphicsLib.expand(bounds, margin
+							+ (int) (1 / display.getScale()));
+					DisplayLib.fitViewToBounds(display, bounds, duration);
+				}
+			}
+		});
+		zoomButtons.add(zoomFit);
+		boxpanel.add(zoomButtons);
+		return boxpanel;
+	}
+
+	private void setupDisplay() {
+		// set up the display
+		display = new Display(mvis);
+		display.setSize(800, 800);
+		display.pan(400, 400);
+		display.setHighQuality(true);
+		// display.setItemSorter(new TreeDepthItemSorter());
+
+		display.addControlListener(new BlobDragControl());
+		display.addControlListener(new PanControl());
+		display.addControlListener(new WheelZoomControl());
+		display.addControlListener(new PopupListener());
+	}
+
+	private Box setupForceControlButton() {
+		Box forcebuttons = new Box(BoxLayout.Y_AXIS);
+		forcebuttons.setAlignmentX(Component.LEFT_ALIGNMENT);
+		pause.addActionListener(new PauseForceAction());
+		pause.setEnabled(true);
+		forcebuttons.add(pause);
+
+		forcebuttons.setBorder(BorderFactory
+				.createTitledBorder("Force simulation ctrl"));
+		forcebuttons.setMaximumSize(new Dimension(Short.MAX_VALUE,
+				Short.MAX_VALUE));
+
+		return forcebuttons;
+	}
+
+	private void setupModelStepListeners() {
+		bgf.registerOpcodeListener("EXT", new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				ended = true;
+				step.setEnabled(false);
+				tmpStopForce();
+
+				mvis.run(ACTION_1SFORCE);
+			}
+		});
+		bgf.registerStepListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				StepResult sr = (StepResult) e.getSource();
+				VisualItem vnn = (VisualItem) vg.getNode(bgf
+						.getNode(sr.apbnext).getRow());
+				mvis.getGroup(Visualization.FOCUS_ITEMS).setTuple(vnn);
+			}
+		});
+	}
+
+	private void setupRenderer() {
+		LabelRenderer tr = new LabelRenderer();
+		tr.setRoundedCorner(8, 8);
+		DefaultRendererFactory dfr = new DefaultRendererFactory(tr,
+				new BlobEdgeRenderer());
+		mvis.setRendererFactory(dfr);
+	}
+
+	private Box setupSlider() {
+		Color c = UIManager.getLookAndFeel().getDefaults().getColor("Panel.background");
+		slider.setBackground(c);
+
+		slider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				int sliderHops = slider.getValue().intValue();
+				filter.setDistance(sliderHops);
+				prefs.putInt(PREFS_LAST_HOPS,sliderHops);
+
+				if (!mvis.getAction(ACTION_FORCE).isRunning()){
+					mvis.cancel(ACTION_1SFORCE);
+					mvis.run(ACTION_1SFORCE);
+				}
+			}
+		});
+
+		Box cf = new Box(BoxLayout.Y_AXIS);
+		cf.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cf.add(slider);
+		cf.setBorder(BorderFactory.createTitledBorder("Connectivity Filter"));
+		return cf;
+	}
+
+	private final Box setupStepButton() {
+		Box buttons = new Box(BoxLayout.X_AXIS);
+		JPanel mig = new JPanel(new MigLayout());
+		buttons.setBorder(BorderFactory.createTitledBorder("Blob Model"));
+		buttons.setAlignmentX(LEFT_ALIGNMENT);
+
+		stepModelAction = new StepModelAction();
+
+		step.addActionListener(stepModelAction);
+		step.setEnabled(true);
+		mig.add(step);
+
+		play.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (!ended && !mvis.getAction(ACTION_PLAY).isRunning()) {
+					mvis.cancel(ACTION_PLAY);
+					mvis.run(ACTION_PLAY);
+					play.setText("Stop program");
+				} else {
+					play.setText("Play program");
+					mvis.cancel(ACTION_PLAY);
+				}
+			}
+		});
+
+		mig.add(play);
+		play.setEnabled(true);
+		restart.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				tmpStopForce();
+				readProgramAndDataAsGraph(currentFile);
+
+			}
+		});
+		restart.setEnabled(true);
+		mig.add(restart);
+
+		buttons.setMaximumSize(new Dimension(Short.MAX_VALUE, Short.MAX_VALUE));
+		buttons.add(mig);
+		return buttons;
+	}
+
+	/**
+	 * Start force simulation actions.
+	 * 
+	 * Helper for force simulation action controls.
+	 */
+	private void startForce() {
+		mvis.run(ACTION_FORCE);
+		pause.setText("Pause force simulation");
+		paused = false;
+	}
+
+	/**
+	 * Stop force simulation actions.
+	 * 
+	 * Helper for force simulation action controls.
+	 */
+	private void stopForce() {
+		mvis.cancel(ACTION_FORCE);
+		pause.setText("Start force simulation");
+		paused = true;
+	}
+
+	/**
+	 * Start force simulation if needed;
+	 */
+	private void tmpRestartForce() {
+		if (paused) {
+			pause.setText("Start force simulation");
+			mvis.cancel(ACTION_FORCE);
+		} else {
+			mvis.run(ACTION_FORCE);
+			pause.setText("Pause force simulation");
+
+		}
+	}
+
+	private void tmpRunForce1s() {
+		if (isForcePaused()) {
+			mvis.cancel(ACTION_1SFORCE);
+			mvis.run(ACTION_1SFORCE);
+		}
+	}
+
+	/**
+	 * Stop force simulation, temporarily. Keep current state
+	 */
+	private void tmpStopForce() {
+		mvis.cancel(ACTION_FORCE);
+		pause.setText("Start force simulation");
+	}
+
+	/**
+	 * Toggle the force simulation
+	 * 
+	 * @return true if new state is "running"
+	 */
+	private boolean toggleForce() {
+		if (mvis.getAction(ACTION_FORCE).isRunning()) {
+			stopForce();
+			return false; //NOPMD
+		} else {
+			startForce();
+			return true;
+		}
+	}
+
+	private void toggleGrayscale() {
+		grayScale ^= true;
+		colorsetup = getColorSetup(grayScale);
+
+
+		String[] actionlist = { ACTION_FORCE, ACTION_1SFORCE, "init" };
+		for (String s : actionlist) {
+			boolean isRunning = mvis.getAction(s).isRunning();
+			ActionList al = (ActionList) mvis.removeAction(s);
+			al.remove(1);
+			al.add(1, colorsetup);
+			mvis.putAction(s, al);
+			if (isRunning) {
+				mvis.run(s);
+			}
+		}
+		tmpRunForce1s();
+
 	}
 }

@@ -28,8 +28,8 @@ public class BlobGraphFuser implements BlobFuser {
 	private Node root;
 
 	// Fusion between nodes and blobs
-	private Map<Blob, Node> bton;
-	private Map<Integer, Blob> ntob;
+	private final Map<Blob, Node> bton;
+	private final Map<Integer, Blob> ntob;
 
 	public BlobGraphFuser() {
 		internalReset();
@@ -37,58 +37,15 @@ public class BlobGraphFuser implements BlobFuser {
 		ntob = new HashMap<Integer, Blob>();
 	}
 
-	public void readBlobModelConfiguration(String filename){
-		getModel().readConfiguration(filename);
-	}
-
-
-	public void reset(){
-		internalReset();
-	}
-	private void internalReset(){
-		if (g!= null){ g.clear(); }
-		if (m != null){ m.reset(); }
-		setGraph(new Graph());
-		setModel(new Model());
-		getGraph().getNodeTable().addColumns(BFConstants.LABEL_SCHEMA);
-		getGraph().getNodeTable().addColumns(BFConstants.BLOB_SCHEMA);
-		getGraph().getEdgeTable().addColumns(BFConstants.EDGE_SCHEMA);
-	}
-
-	/* TODO: shouldnt be neccessary */
-	public void setVisualGraph(VisualGraph vg) {
-		this.vg = vg;
-	}
-
-	/* (non-Javadoc)
-	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
-	 */
-	public void addEdge(Blob b1,BondSite bs1, Blob b2,BondSite bs2){
-		Blob.link(b1, b2, bs1, bs2);
-		addEdge(b1,b2);
-	}
-
-	/* (non-Javadoc)
-	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
-	 */
-	public void addEdge(Blob b1,Blob b2){
-		FuseUtil.addEdge(getGraph(),getNode(b1),b1,getNode(b2),b2);
-	}
-
-	/**
-	 * Save the given Node as the focus point of the blob simulation.
-	 * 
-	 * The APB of "The Bug".
-	 * @param r Node to set as the current focus point.
-	 */
-	private void saveRoot(Node r) {
-		root = r;
+	private Blob adb() {
+		return getModel().ADB();
 	}
 
 
 	/* (non-Javadoc)
 	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addBlobAsNode(model.Blob, boolean)
 	 */
+	@Override
 	public Node addBlobAsNode(Blob b,boolean inPgr) {
 		assert(getNode(b) == null);
 		if (getNode(b) != null){
@@ -106,66 +63,6 @@ public class BlobGraphFuser implements BlobFuser {
 		}
 		return n;
 	}
-
-	private void setRelation(Blob b, Node n) {
-		bton.put(b, n);
-		ntob.put(n.getRow(), b);
-	}
-
-	private void setSrcBondSite(Node srcn, Blob target, BondSite newvalue) {
-		Node bbn1 = getNode(target);
-		Edge e1 = getGraph().getEdge(srcn, bbn1);
-		if (e1 != null) {
-			e1.set(BFConstants.EDGENUMBERSRC, newvalue.ordinal());
-		} else {
-			e1 = getGraph().getEdge(bbn1, srcn);
-			e1.set(BFConstants.EDGENUMBERTAR, newvalue.ordinal());
-		}
-	}
-
-	/**
-	 * Initialize a prefuse Graph from the contents of a Blob simulator
-	 * datastructure.
-	 * 
-	 * This method takes a Progressable which will get progress % of the
-	 * operation.
-	 * @param p Progressable which will recieve progress information (0->100%)
-	 * @throws InterruptedException if interupted in some way.
-	 */
-	public void populateGraphFromModelAPB(Progressable p) throws InterruptedException {
-		DFSBlob dfs = new DFSBlob(this, getModel().APB(),getModel().count());
-		dfs.setProgressable(p);
-		runDFS(dfs);
-	}
-	public void populateGraphFromModelAPB() throws InterruptedException {
-		runDFS(new DFSBlob(this, getModel().APB(),getModel().count()));
-	}
-
-	private void runDFS(DFSBlob dfs) throws InterruptedException {
-		dfs.run();
-		saveRoot(getNode(getModel().APB()));
-	}
-
-	public Blob addDataBlobToBondSite(Blob b, BondSite from,
-			BondSite to, int cargo) {
-		return addDataBlobToBondSite(getNode(b),from,to,cargo);
-	}
-
-	/**
-	 * Insert a new Blob at item with the given bondsites as connection points
-	 * and with the given cargo
-	 * @param item Base to add new blob to
-	 * @param from the Bondsite on the existing blob
-	 * @param to Bondsite on the new node
-	 * @param cargo The cargo to set.
-	 */
-	public Blob addDataBlobToBondSite(Tuple item, BondSite from,
-			BondSite to, int cargo) {
-		return addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
-				false, cargo);
-
-	}
-
 	private Blob addBlobToBondSite(Tuple n, Blob blob, BondSite from,
 			BondSite to, boolean inPgr, int cargo) {
 
@@ -194,201 +91,51 @@ public class BlobGraphFuser implements BlobFuser {
 		return bn;
 	}
 
-	public Blob getBlob(Tuple item) {
-		Blob ret = ntob.get(item.getRow());
-		if (ret == null){
-			throw new NoSuchElementException("Failed to find "+item+" in the blobGraphFuser libraries");
-		}
-		return ret;
+	public Blob addDataBlobToBondSite(Blob b, BondSite from,
+			BondSite to, int cargo) {
+		return addDataBlobToBondSite(getNode(b),from,to,cargo);
 	}
 
-	public void removeBlob(VisualItem vi) {
-		Blob b = ntob.get(vi.getRow());
-		for (int i = 0; i < 4; i++) {
-			BondSite bs = BondSite.create(i);
-			Blob otherend = b.follow(bs);
-			if (otherend != null) {
-				Blob.unlink(b, otherend, bs, otherend.boundTo(b));
-			}
-		}
-		getGraph().removeNode(vi.getRow());
-	}
-
-	private Node getRoot() {
-		return root;
-	}
-
-	private void rereadCargo(Blob b) {
-		Node n = bton.get(b);
-		boolean inp = (Boolean)n.get(BFConstants.BLOBINPGR);
-		if (inp){
-			n.setString(BFConstants.LABEL,b.opCode());
-		}else{
-			n.setString(BFConstants.LABEL,b.getCargo()+"");
-		}
-	}
-
-	public Node getNode(Blob b) {
-		return bton.get(b);
-	}
-
-	private void removeEdge(Blob b1, Blob b2) {
-		removeEdge(getNode(b1),getNode(b2));
+	/**
+	 * Insert a new Blob at item with the given bondsites as connection points
+	 * and with the given cargo
+	 * @param item Base to add new blob to
+	 * @param from the Bondsite on the existing blob
+	 * @param to Bondsite on the new node
+	 * @param cargo The cargo to set.
+	 */
+	public Blob addDataBlobToBondSite(Tuple item, BondSite from,
+			BondSite to, int cargo) {
+		return addBlobToBondSite(item, ntob.get(item.getRow()), from, to,
+				false, cargo);
 
 	}
-	private void removeEdge(Node n1, Node n2) {
-		FuseUtil.removeEdge(g,n1,n2,false);
+
+	/* (non-Javadoc)
+	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
+	 */
+	@Override
+	public void addEdge(Blob b1,Blob b2){
+		FuseUtil.addEdge(getGraph(),getNode(b1),b1,getNode(b2),b2);
 	}
 
-	private void linkNodes(Node n1, BondSite b1, Node n2, BondSite b2) {
-		// loop over adb/dest edges.
-		// Remove all with src/tar of b1/ds
-		// link adb with dest. Set src=b1, tar=ds
-		List<Edge> rems = gatherRemoveList(b1, n1);
-		// System.out.println("dstn: " + n2);
-		rems.addAll(gatherRemoveList(b2, n2));
-		for (Edge element : rems) {
-			Edge edge = element;
-			if (edge.isValid()){
-				FuseUtil.removeEdge(g,edge.getSourceNode(),edge.getTargetNode(),true);
-			}
-		}
-		if (n1 != null && n2 != null){
-			Edge ne = getGraph().addEdge(n1, n2);
-
-			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
-			ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
-		}
+	/* (non-Javadoc)
+	 * @see dk.diku.blob.blobvis.prefuse.BlobFuser#addEdge(model.Blob, model.Blob)
+	 */
+	public void addEdge(Blob b1,BondSite bs1, Blob b2,BondSite bs2){
+		Blob.link(b1, b2, bs1, bs2);
+		addEdge(b1,b2);
 	}
 
-	@SuppressWarnings("unchecked")
-	private List<Edge> gatherRemoveList(BondSite needle, Node n) {
-
-		List<Edge> rems = new ArrayList<Edge>();
-		if (n== null) {
-			return rems;
-		}
-		Iterator removeIterator = n.edges();
-		while (removeIterator.hasNext()) {
-			Edge ce = (Edge) removeIterator.next();
-			String field = ce.getSourceNode() == n ? BFConstants.EDGENUMBERSRC
-					: BFConstants.EDGENUMBERTAR;
-			int bsi = (Integer) ce.get(field);
-			if (bsi == needle.ordinal()) {
-				rems.add(ce);
-			}
-		}
-		return rems;
-	}
-
-	private void updateTheBug(Node r, Node nn, Node adbncur, Node adbnnext) {
-		Edge thebug = getGraph().addEdge(nn, adbnnext);
-		removeEdge(r, adbncur);
-		adbncur.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
-		FuseUtil.setNodeInPgr(adbncur,false);
-		FuseUtil.setNodeAdb(adbnnext);
-		/* System.out.println(nn + " -> " + adbnnext); */
-		thebug.set(BFConstants.EDGENUMBERSRC, 0);
-		thebug.set(BFConstants.EDGENUMBERTAR, 0);
-	}
-
-
-	private void stepModel(){
-		getModel().step();
-		Node n = getNode(apb());
-		saveRoot(n);
-		FuseUtil.setNodeApb(n);
-	}
 
 	private Blob apb() {
 		return getModel().APB();
 	}
-	private Blob adb() {
-		return getModel().ADB();
-	}
 
-	public void step(){
+	private StepResult doCHD(Blob apb, Blob adb) {
 		StepResult result;
-		Operation o = Operation.parse(apb().opCode());
-		switch (o.type) {
-		case CHD:
-			result = doCHD(apb(), adb());
-			break;
-		case SCG:
-		case DBS:
-			result = new StepResult(apb(), adb()).reread(true);
-			break;
-		case JB:
-			result = doJB(apb(), adb());
-			break;
-		case SBS:
-			result = doSBS(apb(), adb());
-			break;
-		case JN:
-			result = doJN(apb(), adb());
-			break;
-		case SWL:
-			result = doSWL(apb(), adb());
-			break;
-		case JCG:
-			result = doJCG(apb(), adb());
-			break;
-		case INS:
-			result = doINS(apb(),adb(),o);
-			break;
-		case SWP3:
-			result = doSWP3(apb(),adb(),o);
-			break;
-		case SWP1:
-			result = doSWP1(apb(),adb(),o);
-			break;
-
-		case FIN:
-			// do default action.
-
-
-		default:
-			result = new StepResult(apb(), adb()); // Default action
-			break;
-		}
-		execute(result);
-	}
-
-	private void doSWP(Blob adb,BondSite bs0, BondSite bs1, BondSite bs2){
-		Blob b1=adb.follow(bs1);
-		Blob b10=adb.follow(bs1).follow(bs0);
-		Blob b2 = adb.follow(bs2);
-		Blob b20=adb.follow(bs2).follow(bs0);
-
-		if (b10 != null){
-			Edge ne = getGraph().addEdge(getNode(b2), getNode(b10));
-			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
-			ne.set(BFConstants.EDGENUMBERTAR, b10.boundTo(b1).ordinal());
-			FuseUtil.removeEdge(getGraph(), getNode(b1), getNode(b10),true);
-			System.out.println("B10:"+b10+". New edge from "+b2+" to "+b10);
-		}
-		if (b20 != null){
-			Edge ne = getGraph().addEdge(getNode(b1), getNode(b20));
-			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
-			ne.set(BFConstants.EDGENUMBERTAR, b20.boundTo(b2).ordinal());
-			FuseUtil.removeEdge(getGraph(), getNode(b2), getNode(b20),true);
-			System.out.println("B10:"+b20+". New edge from "+b1+" to "+b20);
-		}
-
-
-	}
-	private StepResult doSWP3(Blob apb, Blob adb,Operation o) {
-		StepResult result =  new StepResult(apb, adb);
-		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
-		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
-		doSWP(adb,BondSite.West,b1,b2);
-		return result;
-	}
-	private StepResult doSWP1(Blob apb, Blob adb,Operation o) {
-		StepResult result =  new StepResult(apb, adb);
-		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
-		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
-		doSWP(adb,BondSite.East,b1,b2);
+		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+		result = new StepResult(apb, adb).adbNext(b);
 		return result;
 	}
 
@@ -414,28 +161,60 @@ public class BlobGraphFuser implements BlobFuser {
 		return result;
 	}
 
-
-	protected void execute(StepResult sr){
-		sr.testValid();
-		FuseUtil.setNodeInPgr(getRoot());
-		Node n = getNode(sr.apbcur);
-		Node nn = getNode(sr.apbnext);
-		updateTheBug(n, nn, getNode(sr.adbcur),
-				getNode(sr.adbnext));
-		if (!sr.nostep){
-			stepModel();
+	private StepResult doJB(Blob apb, Blob adb) {
+		StepResult result;
+		result = new StepResult(apb, adb).reread(false);
+		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
+		result.apbNext(apb.follow(getModel().ADB().follow(b) == null ? BondSite.West
+				: BondSite.South));
+		return result;
+	}
+	private StepResult doJCG(Blob apb, Blob adb) {
+		StepResult result;
+		int c = (4 + 2 + 1) & apb.getCargo();
+		result = new StepResult(apb, adb);
+		if (!adb.getCargo(c)) {
+			result.apbNext(BondSite.West);
 		}
-		if (sr.rereadCargo){
-			rereadCargo(sr.adbnext);
-		}
-
-		/*System.out.println(sr.adbnext+" "+m.ADB());
-		for(BondSite bs : BondSite.asList()){
-			System.out.print(bs.ordinal()+":"+sr.adbnext.follow(bs)+" ");
-		}
-		System.out.println(";");*/
+		return result;
 	}
 
+	private StepResult doJN(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b1 = BondSite
+		.create(((8 + 4) & apb.getCargo()) / 4);
+		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+
+		Blob dest1 = adb.follow(b1);
+		Blob dest = dest1.follow(b2);
+		Node destn = getNode(dest);
+		if (dest != null) {
+			BondSite ds = dest.boundTo(dest1);
+			linkNodes(getNode(adb), b1, destn, ds);
+		} else {
+			Node n = getNode(dest1);
+			removeEdge(getNode(adb), n);
+		}
+		result = new StepResult(apb, adb);
+		return result;
+	}
+
+	private StepResult doSBS(Blob apb, Blob adb) {
+		StepResult result;
+		BondSite b1 = BondSite
+		.create(((8 + 4) & apb.getCargo()) / 4);
+		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+		Blob bb1 = adb.follow(b1);
+		Blob bb2 = adb.follow(b2);
+		if (bb1 != null) {
+			setSrcBondSite(getNode(adb), bb1, b2);
+		}
+		if (bb2 != null) {
+			setSrcBondSite(getNode(adb), bb2, b1);
+		}
+		result = new StepResult(apb, adb);
+		return result;
+	}
 
 	private StepResult doSWL(Blob apb, Blob adb) {
 		StepResult result = new StepResult(apb, adb);
@@ -501,83 +280,307 @@ public class BlobGraphFuser implements BlobFuser {
 		return result;
 	}
 
-	private StepResult doJN(Blob apb, Blob adb) {
-		StepResult result;
-		BondSite b1 = BondSite
-		.create(((8 + 4) & apb.getCargo()) / 4);
-		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
+	private void doSWP(Blob adb,BondSite bs0, BondSite bs1, BondSite bs2){
+		Blob b1=adb.follow(bs1);
+		Blob b10=adb.follow(bs1).follow(bs0);
+		Blob b2 = adb.follow(bs2);
+		Blob b20=adb.follow(bs2).follow(bs0);
 
-		Blob dest1 = adb.follow(b1);
-		Blob dest = dest1.follow(b2);
-		Node destn = getNode(dest);
-		if (dest != null) {
-			BondSite ds = dest.boundTo(dest1);
-			linkNodes(getNode(adb), b1, destn, ds);
-		} else {
-			Node n = getNode(dest1);
-			removeEdge(getNode(adb), n);
+		if (b10 != null){
+			Edge ne = getGraph().addEdge(getNode(b2), getNode(b10));
+			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b10.boundTo(b1).ordinal());
+			FuseUtil.removeEdge(getGraph(), getNode(b1), getNode(b10),true);
+			System.out.println("B10:"+b10+". New edge from "+b2+" to "+b10);
 		}
-		result = new StepResult(apb, adb);
-		return result;
-	}
-
-	private StepResult doSBS(Blob apb, Blob adb) {
-		StepResult result;
-		BondSite b1 = BondSite
-		.create(((8 + 4) & apb.getCargo()) / 4);
-		BondSite b2 = BondSite.create((2 + 1) & apb.getCargo());
-		Blob bb1 = adb.follow(b1);
-		Blob bb2 = adb.follow(b2);
-		if (bb1 != null) {
-			setSrcBondSite(getNode(adb), bb1, b2);
+		if (b20 != null){
+			Edge ne = getGraph().addEdge(getNode(b1), getNode(b20));
+			ne.set(BFConstants.EDGENUMBERSRC, bs0.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b20.boundTo(b2).ordinal());
+			FuseUtil.removeEdge(getGraph(), getNode(b2), getNode(b20),true);
+			System.out.println("B10:"+b20+". New edge from "+b1+" to "+b20);
 		}
-		if (bb2 != null) {
-			setSrcBondSite(getNode(adb), bb2, b1);
+
+
+	}
+
+	private StepResult doSWP1(Blob apb, Blob adb,Operation o) {
+		StepResult result =  new StepResult(apb, adb);
+		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
+		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
+		doSWP(adb,BondSite.East,b1,b2);
+		return result;
+	}
+
+	private StepResult doSWP3(Blob apb, Blob adb,Operation o) {
+		StepResult result =  new StepResult(apb, adb);
+		BondSite b1 = BondSite.create(Integer.parseInt(o.args.get(0)));
+		BondSite b2 = BondSite.create(Integer.parseInt(o.args.get(1)));
+		doSWP(adb,BondSite.West,b1,b2);
+		return result;
+	}
+
+	protected void execute(StepResult sr){
+		sr.testValid();
+		FuseUtil.setNodeInPgr(getRoot());
+		Node n = getNode(sr.apbcur);
+		Node nn = getNode(sr.apbnext);
+		updateTheBug(n, nn, getNode(sr.adbcur),
+				getNode(sr.adbnext));
+		if (!sr.nostep){
+			stepModel();
 		}
-		result = new StepResult(apb, adb);
-		return result;
-	}
-
-	private StepResult doJCG(Blob apb, Blob adb) {
-		StepResult result;
-		int c = (4 + 2 + 1) & apb.getCargo();
-		result = new StepResult(apb, adb);
-		if (!adb.getCargo(c)) {
-			result.apbNext(BondSite.West);
+		if (sr.rereadCargo){
+			rereadCargo(sr.adbnext);
 		}
-		return result;
+
+		/*System.out.println(sr.adbnext+" "+m.ADB());
+		for(BondSite bs : BondSite.asList()){
+			System.out.print(bs.ordinal()+":"+sr.adbnext.follow(bs)+" ");
+		}
+		System.out.println(";");*/
 	}
 
-	private StepResult doCHD(Blob apb, Blob adb) {
-		StepResult result;
-		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-		result = new StepResult(apb, adb).adbNext(b);
-		return result;
+	private List<Edge> gatherRemoveList(BondSite needle, Node n) {
+
+		List<Edge> rems = new ArrayList<Edge>();
+		if (n== null) {
+			return rems;
+		}
+		@SuppressWarnings("rawtypes")
+		Iterator removeIterator = n.edges();
+		while (removeIterator.hasNext()) {
+			Edge ce = (Edge) removeIterator.next();
+			String field = ce.getSourceNode() == n ? BFConstants.EDGENUMBERSRC
+					: BFConstants.EDGENUMBERTAR;
+			int bsi = (Integer) ce.get(field);
+			if (bsi == needle.ordinal()) {
+				rems.add(ce);
+			}
+		}
+		return rems;
 	}
 
-	private StepResult doJB(Blob apb, Blob adb) {
-		StepResult result;
-		result = new StepResult(apb, adb).reread(false);
-		BondSite b = BondSite.create((2 + 1) & apb.getCargo());
-		result.apbNext(apb.follow(getModel().ADB().follow(b) == null ? BondSite.West
-				: BondSite.South));
-		return result;
+	public Blob getBlob(Tuple item) {
+		Blob ret = ntob.get(item.getRow());
+		if (ret == null){
+			throw new NoSuchElementException("Failed to find "+item+" in the blobGraphFuser libraries");
+		}
+		return ret;
 	}
 
-	private void setModel(Model m) {
-		this.m = m;
+	public Graph getGraph() {
+		return g;
 	}
-
 	public Model getModel() {
 		return m;
+	}
+
+	public Node getNode(Blob b) {
+		return bton.get(b);
+	}
+
+	
+	private Node getRoot() {
+		return root;
+	}
+
+	private void internalReset(){
+		if (g!= null){ g.clear(); }
+		if (m != null){ m.reset(); }
+		setGraph(new Graph());
+		setModel(new Model());
+		getGraph().getNodeTable().addColumns(BFConstants.LABEL_SCHEMA);
+		getGraph().getNodeTable().addColumns(BFConstants.BLOB_SCHEMA);
+		getGraph().getEdgeTable().addColumns(BFConstants.EDGE_SCHEMA);
+	}
+
+
+	private void linkNodes(Node n1, BondSite b1, Node n2, BondSite b2) {
+		// loop over adb/dest edges.
+		// Remove all with src/tar of b1/ds
+		// link adb with dest. Set src=b1, tar=ds
+		List<Edge> rems = gatherRemoveList(b1, n1);
+		// System.out.println("dstn: " + n2);
+		rems.addAll(gatherRemoveList(b2, n2));
+		for (Edge element : rems) {
+			Edge edge = element;
+			if (edge.isValid()){
+				FuseUtil.removeEdge(g,edge.getSourceNode(),edge.getTargetNode(),true);
+			}
+		}
+		if (n1 != null && n2 != null){
+			Edge ne = getGraph().addEdge(n1, n2);
+
+			ne.set(BFConstants.EDGENUMBERSRC, b1.ordinal());
+			ne.set(BFConstants.EDGENUMBERTAR, b2.ordinal());
+		}
+	}
+
+	public void populateGraphFromModelAPB() throws InterruptedException {
+		runDFS(new DFSBlob(this, getModel().APB(),getModel().count()));
+	}
+	/**
+	 * Initialize a prefuse Graph from the contents of a Blob simulator
+	 * datastructure.
+	 * 
+	 * This method takes a Progressable which will get progress % of the
+	 * operation.
+	 * @param p Progressable which will recieve progress information (0->100%)
+	 * @throws InterruptedException if interupted in some way.
+	 */
+	public void populateGraphFromModelAPB(Progressable p) throws InterruptedException {
+		DFSBlob dfs = new DFSBlob(this, getModel().APB(),getModel().count());
+		dfs.setProgressable(p);
+		runDFS(dfs);
+	}
+
+	public void readBlobModelConfiguration(String filename){
+		getModel().readConfiguration(filename);
+	}
+
+	public void removeBlob(VisualItem vi) {
+		Blob b = ntob.get(vi.getRow());
+		for (int i = 0; i < 4; i++) {
+			BondSite bs = BondSite.create(i);
+			Blob otherend = b.follow(bs);
+			if (otherend != null) {
+				Blob.unlink(b, otherend, bs, otherend.boundTo(b));
+			}
+		}
+		getGraph().removeNode(vi.getRow());
+	}
+	private void removeEdge(Blob b1, Blob b2) {
+		removeEdge(getNode(b1),getNode(b2));
+
+	}
+	private void removeEdge(Node n1, Node n2) {
+		FuseUtil.removeEdge(g,n1,n2,false);
+	}
+
+	private void rereadCargo(Blob b) {
+		Node n = bton.get(b);
+		boolean inp = (Boolean)n.get(BFConstants.BLOBINPGR);
+		if (inp){
+			n.setString(BFConstants.LABEL,b.opCode());
+		}else{
+			n.setString(BFConstants.LABEL,b.getCargo()+"");
+		}
+	}
+
+
+	public void reset(){
+		internalReset();
+	}
+
+
+	private void runDFS(DFSBlob dfs) throws InterruptedException {
+		dfs.run();
+		saveRoot(getNode(getModel().APB()));
+	}
+
+	/**
+	 * Save the given Node as the focus point of the blob simulation.
+	 * 
+	 * The APB of "The Bug".
+	 * @param r Node to set as the current focus point.
+	 */
+	private void saveRoot(Node r) {
+		root = r;
 	}
 
 	private void setGraph(Graph g) {
 		this.g = g;
 	}
 
-	public Graph getGraph() {
-		return g;
+	public void setModel(Model m) {
+		this.m = m;
+	}
+
+	private void setRelation(Blob b, Node n) {
+		bton.put(b, n);
+		ntob.put(n.getRow(), b);
+	}
+
+	private void setSrcBondSite(Node srcn, Blob target, BondSite newvalue) {
+		Node bbn1 = getNode(target);
+		Edge e1 = getGraph().getEdge(srcn, bbn1);
+		if (e1 != null) {
+			e1.set(BFConstants.EDGENUMBERSRC, newvalue.ordinal());
+		} else {
+			e1 = getGraph().getEdge(bbn1, srcn);
+			e1.set(BFConstants.EDGENUMBERTAR, newvalue.ordinal());
+		}
+	}
+
+	/* TODO: shouldnt be neccessary */
+	public void setVisualGraph(VisualGraph vg) {
+		this.vg = vg;
+	}
+
+	public void step(){
+		StepResult result;
+		Operation o = Operation.parse(apb().opCode());
+		switch (o.type) {
+		case CHD:
+			result = doCHD(apb(), adb());
+			break;
+		case SCG:
+		case DBS:
+			result = new StepResult(apb(), adb()).reread(true);
+			break;
+		case JB:
+			result = doJB(apb(), adb());
+			break;
+		case SBS:
+			result = doSBS(apb(), adb());
+			break;
+		case JN:
+			result = doJN(apb(), adb());
+			break;
+		case SWL:
+			result = doSWL(apb(), adb());
+			break;
+		case JCG:
+			result = doJCG(apb(), adb());
+			break;
+		case INS:
+			result = doINS(apb(),adb(),o);
+			break;
+		case SWP3:
+			result = doSWP3(apb(),adb(),o);
+			break;
+		case SWP1:
+			result = doSWP1(apb(),adb(),o);
+			break;
+
+		case FIN:
+			// do default action.
+
+
+		default:
+			result = new StepResult(apb(), adb()); // Default action
+			break;
+		}
+		execute(result);
+	}
+
+	private void stepModel(){
+		getModel().step();
+		Node n = getNode(apb());
+		saveRoot(n);
+		FuseUtil.setNodeApb(n);
+	}
+
+	private void updateTheBug(Node r, Node nn, Node adbncur, Node adbnnext) {
+		Edge thebug = getGraph().addEdge(nn, adbnnext);
+		removeEdge(r, adbncur);
+		adbncur.set(BFConstants.BLOBTYPE, BFConstants.BLOB_TYPE_DATA);
+		FuseUtil.setNodeInPgr(adbncur,false);
+		FuseUtil.setNodeAdb(adbnnext);
+		/* System.out.println(nn + " -> " + adbnnext); */
+		thebug.set(BFConstants.EDGENUMBERSRC, 0);
+		thebug.set(BFConstants.EDGENUMBERTAR, 0);
 	}
 
 }
